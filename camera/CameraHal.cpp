@@ -110,6 +110,7 @@ CameraHal::CameraHal()
     mPreviewThread = new PreviewThread(this);
     mPreviewThread->run("CameraPreviewThread", PRIORITY_URGENT_DISPLAY);
 
+#if VPP_THREAD
 	if( sem_init(&mIppVppSem,0,0)!=0 ){
 		LOGE("Error creating semaphore\n");
 	}
@@ -122,6 +123,7 @@ CameraHal::CameraHal()
 	mVPPThread = new VPPThread(this);
     mVPPThread->run("CameraVPPThread", PRIORITY_URGENT_DISPLAY);
 	LOGD("STARTING VPP THREAD \n");
+#endif
     
 #ifdef FW3A
     if (fobj!=NULL) 
@@ -187,7 +189,7 @@ CameraHal::~CameraHal()
         Mutex::Autolock lock(mLock);
         mPreviewThread.clear();
     }
-
+#if VPP_THREAD
 	sem_destroy(&mIppVppSem);
 
 	vppMessage = VPP_THREAD_EXIT;
@@ -207,7 +209,7 @@ CameraHal::~CameraHal()
         Mutex::Autolock lock(mLock);
         mVPPThread.clear();
     }
-
+#endif
 
 #ifdef ICAP
     ICaptureDestroy();
@@ -822,6 +824,7 @@ int  CameraHal::ICapturePerform()
     struct manual_parameters  manual_config;
     unsigned short ipp_ee_q, ipp_ew_ts, ipp_es_ts, ipp_luma_nf, ipp_chroma_nf; 
 	int vppMessage = 0;
+	overlay_buffer_t overlaybuffer;
 
     LOG_FUNCTION_NAME
 
@@ -889,7 +892,6 @@ int  CameraHal::ICapturePerform()
     PPM("CLOSED AND REOPENED CAMERA");
 #endif
 
-#ifdef ICAP
     iobj->cfg.image_width   = image_width;
     iobj->cfg.image_height  = image_height;
     iobj->cfg.lsc_type      = LSC_UPSAMPLED_BY_SOFTWARE;
@@ -902,10 +904,10 @@ int  CameraHal::ICapturePerform()
     iobj->cfg.cb_write_raw  = NULL;//onSaveRAW;
     manual_config.pre_flash = 0;
 
-    //if(mcapture_mode == 0){
+    if(mcapture_mode == 0){
         LOGD("Capture mode= HP");
         iobj->cfg.capture_mode  =  CAPTURE_MODE_HI_PERFORMANCE;	
-    //}
+    }
 
     status = (capture_status_t) iobj->lib.Config(iobj->lib_private, &iobj->cfg);
     if( ICAPTURE_FAIL == status){
@@ -914,16 +916,10 @@ int  CameraHal::ICapturePerform()
     } 
     LOGD("ICapture config OK");
 
+	LOGD("iobj->cfg.image_width = %d = 0x%x iobj->cfg.image_height=%d = 0x%x", (int)iobj->cfg.image_width, (int)iobj->cfg.image_width,(int)iobj->cfg.image_height,(int)iobj->cfg.image_height);
+
     yuv_len=iobj->cfg.sizeof_img_buf;
     PPM("MORE SETUP - HI PERFORMANCE");
-#else
-    ipp_ee_q =100;
-    ipp_ew_ts=50;
-    ipp_es_ts =50; 
-    ipp_luma_nf =1;
-    ipp_chroma_nf = 1;
-    yuv_len=image_width*image_height*2;
-#endif
 
     /*compute yuv size, allocate memory and take picture*/
     mPictureHeap = new MemoryHeapBase(yuv_len + 0x20 + 256);  
@@ -953,22 +949,20 @@ int  CameraHal::ICapturePerform()
         LOGD("ICapture process OK");
     }
 		
-    ipp_ee_q =iobj->proc.eenf.ee_q,
-    ipp_ew_ts=iobj->proc.eenf.ew_ts,
-    ipp_es_ts=iobj->proc.eenf.es_ts, 
-    ipp_luma_nf=iobj->proc.eenf.luma_nf,
-    ipp_chroma_nf=iobj->proc.eenf.chroma_nf;
+    ipp_ee_q   =   iobj->proc.eenf.ee_q,
+    ipp_ew_ts  =   iobj->proc.eenf.ew_ts,
+    ipp_es_ts  =   iobj->proc.eenf.es_ts, 
+    ipp_luma_nf =  iobj->proc.eenf.luma_nf,
+    ipp_chroma_nf= iobj->proc.eenf.chroma_nf;
 
 	iobj->proc.out_img_h &= 0xFFFFFFF8;
 
-    LOGD("iobj->proc.out_img_w = %d iobj->proc.out_img_h=%u", (int)iobj->proc.out_img_w, (int)iobj->proc.out_img_h);
-    LOGD("iobj->cfg.image_width = %d iobj->cfg.image_height=%d", (int)iobj->cfg.image_width, (int)iobj->cfg.image_height);
-    LOGD("image_width = %d image_height=%d", (int)image_width, (int) image_height);
-
-    //somehow have a different value from mParameters.getPictureSize(&image_width, &image_height);
-    //updating values 
+    LOGD("iobj->proc.out_img_w = %d = 0x%x iobj->proc.out_img_h=%u = 0x%x", (int)iobj->proc.out_img_w,(int)iobj->proc.out_img_w, (int)iobj->proc.out_img_h,(int)iobj->proc.out_img_h);
+    
     image_width = (int)iobj->proc.out_img_w;
     image_height =(int)iobj->proc.out_img_h;
+
+	LOGD("image_width = %d= 0x%x image_height=%d= 0x%x", (int)image_width, (int)image_width,(int) image_height,(int) image_height);
 
 #endif
     PPM("IMAGE CAPTURED");
@@ -985,14 +979,32 @@ int  CameraHal::ICapturePerform()
 #endif	
 
 #ifdef HARDWARE_OMX
+#if VPP_THREAD
 	LOGD("SENDING MESSAGE TO VPP THREAD \n");
 	vpp_buffer =  yuv_buffer;
 	vppMessage = VPP_THREAD_PROCESS;
 	write(vppPipe[1], &vppMessage,sizeof(int));	
+#else
+	snapshot_buffer_index = mOverlay->getBufferCount() - 1;
+	snapshot_buffer = mOverlay->getBufferAddress( (void*)snapshot_buffer_index );
+
+    PPM("BEFORE SCALED DOWN RAW IMAGE TO PREVIEW SIZE"); 
+	status = scale_process(yuv_buffer, image_width, image_height,
+                         snapshot_buffer, preview_width, preview_height);
+	if( status ) LOGE("scale_process() failed");
+	else LOGD("scale_process() OK");
+	 
+	PPM("SCALED DOWN RAW IMAGE TO PREVIEW");
+
+	mOverlay->queueBuffer((void*)snapshot_buffer_index);  //JJ-try removing dequeue buffer
+	mOverlay->dequeueBuffer(&overlaybuffer);
+	
+	PPM("DISPLAYED RAW IMAGE ON SCREEN");
+#endif
 #endif
 
 #ifdef IMAGE_PROCESSING_PIPELINE    
-    PPM("BEFORE IPP");
+    PPM("BEFORE IPP");	
 
     LOGD("Calling ProcessBufferIPP(buffer=%p , len=0x%x)", yuv_buffer, yuv_len);
     err = ProcessBufferIPP(yuv_buffer, yuv_len,
@@ -1063,9 +1075,11 @@ int  CameraHal::ICapturePerform()
     mPictureBuffer.clear();
     mPictureHeap.clear();
 
+#if VPP_THREAD
 	LOGD("CameraHal thread before waiting increment in semaphore\n");
 	sem_wait(&mIppVppSem);
 	LOGD("CameraHal thread after waiting increment in semaphore\n");
+#endif
     
     PPM("END OF ICapturePerform");
     LOG_FUNCTION_NAME_EXIT
@@ -1092,6 +1106,7 @@ fail_deinit_3afw:
     return 0;
 }
 
+#if VPP_THREAD
 void CameraHal::vppThread(){
 
 	LOG_FUNCTION_NAME
@@ -1163,6 +1178,7 @@ void CameraHal::vppThread(){
 
 	LOG_FUNCTION_NAME_EXIT
 }
+#endif
 
 int CameraHal::ICaptureCreate(void)
 {
@@ -1243,14 +1259,16 @@ int CameraHal::ICaptureCreate(void)
 
 #ifdef IMAGE_PROCESSING_PIPELINE
 
-    res = InitIPP(image_width,image_height);
+
+	//WARNING, it is a temporary workaround but we must remove hardcoded values.
+    res = InitIPP(/*image_width*/3248,/*image_height*/2448);
     if( res ) {
         LOGE("InitIPP() failed");
         goto fail_ipp_init;
     }
     LOGD("InitIPP() OK");
 
-    res = PopulateArgsIPP(image_width,image_height);
+    res = PopulateArgsIPP(/*image_width*/3248,/*image_height*/2448);
     if( res ) {
         LOGE("PopulateArgsIPP() failed");
         goto fail_ipp_populate;

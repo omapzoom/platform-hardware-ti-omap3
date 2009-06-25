@@ -739,8 +739,8 @@ int CameraHal::ZoomPerform(int zoom)
 #ifndef ICAP
 int CameraHal::CapturePicture(){
 
-    int w, h;
-    int pictureSize;
+    int image_width, image_height;
+	int preview_width, preview_height;
     unsigned long base, offset;
     struct v4l2_buffer buffer;
     struct v4l2_format format;
@@ -754,15 +754,20 @@ int CameraHal::CapturePicture(){
     sp<MemoryBase>          mJPEGPictureMemBase;
 	int vppMessage = 0;
 	unsigned short ipp_ee_q, ipp_ew_ts, ipp_es_ts, ipp_luma_nf, ipp_chroma_nf; 
+	int err;
+	overlay_buffer_t overlaybuffer;
+	int snapshot_buffer_index; 
+	void* snapshot_buffer;
 
   LOG_FUNCTION_NAME
 
     if (mShutterCallback)
         mShutterCallback(mPictureCallbackCookie);
 
-    mParameters.getPictureSize(&w, &h);
+    mParameters.getPictureSize(&image_width, &image_height);
+	mParameters.getPreviewSize(&preview_width, &preview_height);	
 
-    LOGD("Picture Size: Width = %d \tHeight = %d", w, h);
+    LOGD("Picture Size: Width = %d \tHeight = %d", image_width, image_height);
 
 #ifdef OPEN_CLOSE_WORKAROUND
     close(camera_device);
@@ -774,8 +779,8 @@ int CameraHal::CapturePicture(){
 #endif
 
     format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    format.fmt.pix.width = w;
-    format.fmt.pix.height = h;
+    format.fmt.pix.width = image_width;
+    format.fmt.pix.height = image_height;
     format.fmt.pix.pixelformat = PIXEL_FORMAT;
 
     /* set size & format of the video image */
@@ -793,15 +798,15 @@ int CameraHal::CapturePicture(){
         return -1;
     }
 
-    pictureSize = w * h * 2;
-    if (pictureSize & 0xfff)
+    yuv_len = image_width * image_height * 2;
+    if (yuv_len & 0xfff)
     {
-        pictureSize = (pictureSize & 0xfffff000) + 0x1000;
+        yuv_len = (yuv_len & 0xfffff000) + 0x1000;
     }
-    LOGD("pictureFrameSize = 0x%x = %d", pictureSize, pictureSize);
+    LOGD("pictureFrameSize = 0x%x = %d", yuv_len, yuv_len);
 
     // Make a new mmap'ed heap that can be shared across processes.
-    mPictureHeap = new MemoryHeapBase(pictureSize + 0x20 + 256);
+    mPictureHeap = new MemoryHeapBase(yuv_len + 0x20 + 256);
     base = (unsigned long)mPictureHeap->getBase();
 
     /*Align buffer to 32 byte boundary */
@@ -813,7 +818,7 @@ int CameraHal::CapturePicture(){
     /* Buffer pointer shifted to avoid DSP cache issues */
     base += 128;
     offset = base - (unsigned long)mPictureHeap->getBase();
-    mPictureBuffer = new MemoryBase(mPictureHeap, offset, pictureSize);
+    mPictureBuffer = new MemoryBase(mPictureHeap, offset, yuv_len);
 
     LOGD("Picture Buffer: Base = %p Offset = 0x%x", (void *)base, (unsigned int)offset);
 
@@ -826,7 +831,7 @@ int CameraHal::CapturePicture(){
         return -1;
     }
 
-    buffer.length = pictureSize;
+    buffer.length = yuv_len;
     buffer.m.userptr = (unsigned long) (mPictureHeap->getBase()) + offset;
 
     struct timeval tv1, tv2;
@@ -875,18 +880,34 @@ int CameraHal::CapturePicture(){
   	}
 #endif
 
-	yuv_buffer = (uint8_t*)buffer.m.userptr;
-	yuv_len = w*h*2;
+	yuv_buffer = (uint8_t*)buffer.m.userptr;	
     LOGD("PictureThread: generated a picture, yuv_buffer=%p yuv_len=%d",yuv_buffer,yuv_len);
 
+	image_height &= 0xFFFFFFF8;
 
 #ifdef HARDWARE_OMX
+#if VPP_THREAD
 	LOGD("SENDING MESSAGE TO VPP THREAD \n");
-	vpp_buffer = yuv_buffer;
+	vpp_buffer =  yuv_buffer;
 	vppMessage = VPP_THREAD_PROCESS;
 	write(vppPipe[1], &vppMessage,sizeof(int));	
-#endif
+#else
+	snapshot_buffer_index = mOverlay->getBufferCount() - 1;
+	snapshot_buffer = mOverlay->getBufferAddress( (void*)snapshot_buffer_index );
 
+	err = scale_process(yuv_buffer, image_width, image_height,
+                         snapshot_buffer, preview_width, preview_height);
+	if( err ) LOGE("scale_process() failed");
+	else LOGD("scale_process() OK");
+	
+	PPM("SCALED DOWN RAW IMAGE TO PREVIEW SIZE");
+
+	mOverlay->queueBuffer((void*)snapshot_buffer_index);  //JJ-try removing dequeue buffer
+	mOverlay->dequeueBuffer(&overlaybuffer);
+	
+	PPM("DISPLAYED RAW IMAGE ON SCREEN");
+#endif
+#endif
 
 #ifdef IMAGE_PROCESSING_PIPELINE    
     PPM("BEFORE IPP");
@@ -910,22 +931,20 @@ int CameraHal::CapturePicture(){
 
     PPM("AFTER IPP");  
 
-	#if !YUV422I 
+	#if !YUV422P 
 		yuv_len=  ((image_width * image_height *3)/2);
 	#endif  
 
 #endif
-
-
     if (mJpegPictureCallback) {
 #ifdef HARDWARE_OMX  
 
-        int jpegSize = (w * h) + 12288;
+        int jpegSize = (image_width * image_height) + 12288;
         mJPEGPictureHeap = new MemoryHeapBase(jpegSize+ 256);
         outBuffer = (void *)((unsigned long)(mJPEGPictureHeap->getBase()) + 128);
 
 		PPM("BEFORE JPEGEnc");
-        jpegEncoder->encodeImage(outBuffer, jpegSize, yuv_buffer, yuv_len, w, h, quality);
+        jpegEncoder->encodeImage(outBuffer, jpegSize, yuv_buffer, yuv_len, image_width, image_height, quality);
 		PPM("AFTER JPEGEnc");
 
 		mJPEGPictureMemBase = new MemoryBase(mJPEGPictureHeap, 128, jpegEncoder->jpegSize);
@@ -945,17 +964,19 @@ int CameraHal::CapturePicture(){
 
 #endif
 
-        gettimeofday(&tv2, NULL);
-        LOGD("Shot to Encode Latency: %ld %ld %ld %ld\n", tv1.tv_sec, tv1.tv_usec, tv2.tv_sec, tv2.tv_usec);
+        
+        PPM("Shot to Encode Latency");
     }
 
     mPictureBuffer.clear();
     mPictureHeap.clear();
 
 #ifdef HARDWARE_OMX
+#if VPP_THREAD
 	LOGD("CameraHal thread before waiting increment in semaphore\n");
 	sem_wait(&mIppVppSem);
 	LOGD("CameraHal thread after waiting increment in semaphore\n");
+#endif
 #endif
 
     PPM("END OF ICapturePerform");

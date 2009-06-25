@@ -77,6 +77,7 @@
 #define OPEN_CLOSE_WORKAROUND	 1
 
 #define JPEG 1
+#define VPP_THREAD 0
 
 #define PPM(str){ \
 	gettimeofday(&ppm, NULL); \
