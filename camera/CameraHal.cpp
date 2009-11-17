@@ -2151,7 +2151,7 @@ status_t CameraHal::setParameters(const CameraParameters &params)
         LOGE("Preview size not supported");
         return -1;
     }
-    LOGD("PreviewSize by App %d x %d", w, h);
+    LOGD("PreviewResolution by App %d x %d", w, h);
 
     params.getPictureSize(&w, &h);
     if (!validateSize(w, h)) {
@@ -2179,7 +2179,7 @@ status_t CameraHal::setParameters(const CameraParameters &params)
 	mParameters.getPictureSize(&w, &h);
 	LOGD("Picture Size by CamHal %d x %d", w, h);
 	mParameters.getPreviewSize(&w, &h);
-	LOGD("Preview Size by CamHal %d x %d", w, h);
+	LOGD("Preview Resolution by CamHal %d x %d", w, h);
 
     quality = params.getInt("jpeg-quality");
     if ( ( quality < 0 ) || (quality > 100) ){
