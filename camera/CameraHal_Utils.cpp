@@ -28,6 +28,8 @@
 
 namespace android {
 
+#define LOG_TAG "CameraHalUtils"
+
 #ifdef FW3A
 int CameraHal::FW3A_Create()
 {
