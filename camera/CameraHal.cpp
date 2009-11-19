@@ -1018,8 +1018,8 @@ void CameraHal::nextPreview()
 
 #else
         if(overlaybufferindex != -1){
-            LOGE("<Dqueue>... [index]=%d",cfilledbuffer.index);
-            LOGE("<Recording>... [index]=%d",overlaybuffer);
+            //LOGE("<Dqueue>... [index]=%d",cfilledbuffer.index);
+            //LOGE("<Recording>... [index]=%d",overlaybuffer);
             cb(timeStamp, mVideoBuffer[(int)overlaybuffer], mRecordingCallbackCookie);
         }
 #endif
@@ -2022,9 +2022,8 @@ static void debugShowFPS()
         mFps =  ((mFrameCount - mLastFrameCount) * float(s2ns(1))) / diff;
         mLastFpsTime = now;
         mLastFrameCount = mFrameCount;
-    }
 	LOGD("####### [%d] Frames, %f FPS", mFrameCount, mFps);
-    // XXX: mFPS has the value we want
+    }
  }
 
 void CameraHal::releaseRecordingFrame(const sp<IMemory>& mem)
@@ -2060,7 +2059,7 @@ void CameraHal::releaseRecordingFrame(const sp<IMemory>& mem)
     if (ioctl(camera_device, VIDIOC_QBUF, &v4l2_cam_buffer[index]) < 0) {
         LOGE("VIDIOC_QBUF Failed, index [%d] line=%d",index,__LINE__);
     } else {
-        LOGE("releaseRecordingFrame index##[%d]",index);
+        //LOGE("releaseRecordingFrame index##[%d]",index);
 	    nCameraBuffersQueued++;
 	}
 
