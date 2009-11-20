@@ -3654,7 +3654,17 @@ const char *control_elements_of_interest[] = {
  * replace the hard-coded _enumerated/_boolean/_integer by
  * something better, also remove the hard-coded values_of_control
  */
-int values_of_control[] = {5,3,2,1,1};
+#define AUX_CAPTURE_ROUTE_ON 1
+#define AUX_CAPTURE_ROUTE_OFF 0
+
+#define ANALOG_LOOPBACK_ON 1
+#define ANALOG_LOOPBACK_OFF 0
+
+#define DEFAULT_SPEAKER_ON_VOLUME 5
+#define DEFAULT_SPEAKER_OFF_VOLUME 0
+
+int values_of_control[] = {DEFAULT_SPEAKER_ON_VOLUME,AUX_CAPTURE_ROUTE_ON,AUX_CAPTURE_ROUTE_ON,ANALOG_LOOPBACK_ON,ANALOG_LOOPBACK_ON};
+
 const char card[]="default";
 static int g_t2_default_auxl, g_t2_default_auxr;
 
@@ -3787,19 +3797,19 @@ fm_status unset_fmapp_audio_routing(fm_rx_context_s *fm_context)
          return FMC_STATUS_FAILED;
      }
 
-     error_code = configure_T2_AUX_FM_volume_level(ctl, 0);
+     error_code = configure_T2_AUX_FM_volume_level(ctl,DEFAULT_SPEAKER_OFF_VOLUME);
      CHECK_ALSACTL_WR_STATUS(ctl,error_code,control_elements_of_interest[0]);
 
-     error_code = configure_T2_AUXL(ctl,0);
+     error_code = configure_T2_AUXL(ctl,AUX_CAPTURE_ROUTE_OFF);
      CHECK_ALSACTL_WR_STATUS(ctl,error_code,control_elements_of_interest[1]);
 
-     error_code = configure_T2_AUXR(ctl,0);
+     error_code = configure_T2_AUXR(ctl,AUX_CAPTURE_ROUTE_OFF);
      CHECK_ALSACTL_WR_STATUS(ctl,error_code,control_elements_of_interest[2]);
 
-     error_code = configure_T2_Left2_analog_switch(ctl,0);
+     error_code = configure_T2_Left2_analog_switch(ctl,ANALOG_LOOPBACK_OFF);
      CHECK_ALSACTL_WR_STATUS(ctl,error_code,control_elements_of_interest[3]);
 
-     error_code = configure_T2_Right2_analog_switch(ctl,0);
+     error_code = configure_T2_Right2_analog_switch(ctl,ANALOG_LOOPBACK_OFF);
      CHECK_ALSACTL_WR_STATUS(ctl,error_code,control_elements_of_interest[4]);
 
      snd_ctl_close(ctl);
