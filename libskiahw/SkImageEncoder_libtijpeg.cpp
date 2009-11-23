@@ -37,7 +37,7 @@
 #define PRINTF SkDebugf
 //#define PRINTF printf
 
-#define MULTIPLE 16 //image width must be a multiple of this number
+#define MULTIPLE 2 //image width must be a multiple of this number
 
 #define JPEG_ENCODER_DUMP_INPUT_AND_OUTPUT 0
 
@@ -218,7 +218,7 @@ bool SkTIJPEGImageEncoder::onEncode(SkWStream* stream, const SkBitmap& bm, int q
     memcpy(inputBuffer, bm.getPixels(), bm.getSize());
 #else
     int pad_width = w%MULTIPLE;
-    int pad_height = h%2;
+    int pad_height = h%MULTIPLE;
     int pixels_to_pad = 0;
     if (pad_width)
         pixels_to_pad = MULTIPLE - pad_width;

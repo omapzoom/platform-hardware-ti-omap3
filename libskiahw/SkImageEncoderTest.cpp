@@ -1,6 +1,6 @@
 #include "SkImageEncoder_libtijpeg.h"
 
-#define MULTIPLE 16 //image width must be a multiple of this number
+#define MULTIPLE 2 //image width must be a multiple of this number
 
 
 int main(int argc, char **argv)
@@ -73,7 +73,7 @@ int main(int argc, char **argv)
     void *inputBuffer = (void*)((int)inBuffer + 128);
 
     int pad_width = w%MULTIPLE;
-    int pad_height = h%2;
+    int pad_height = h%MULTIPLE;
     int pixels_to_pad = 0;
     if (pad_width)
         pixels_to_pad = MULTIPLE - pad_width;
@@ -130,7 +130,7 @@ int main(int argc, char **argv)
     else 
     {
         printf("\nno padding");
-        memcpy((void *)src, (void*)dst, (w*h*1.5));
+        memcpy((void *)src, (void*)dst, (w*h*nBytesPerPixel));
     }
 
     outbufferlen =  (w * h) + 12288;
