@@ -24,11 +24,11 @@
 *
 */
 
+#define LOG_TAG "CameraHalUtils"
+
 #include "CameraHal.h"
 
 namespace android {
-
-#define LOG_TAG "CameraHalUtils"
 
 #ifdef FW3A
 int CameraHal::FW3A_Create()
@@ -147,7 +147,11 @@ int CameraHal::FW3A_Stop()
 {
     int ret;
 
+#ifdef DEBUG_LOG
+
     LOG_FUNCTION_NAME
+
+#endif
 
     if (isStart_FW3A==0) {
         LOGE("3A FW is already stopped");
@@ -159,13 +163,20 @@ int CameraHal::FW3A_Stop()
     if (0 > ret) {
         LOGE("Cannot Stop 3A");
         return -1;
-    } else {
-        LOGE("3A FW Stop - success");
     }
 
-    LOG_FUNCTION_NAME_EXIT
+#ifdef DEBUG_LOG
+     else {
+        LOGE("3A FW Stop - success");
+    }
+#endif
 
     isStart_FW3A = 0;
+
+#ifdef DEBUG_LOG
+    LOG_FUNCTION_NAME_EXIT
+#endif
+
     return 0;
 }
 
@@ -195,10 +206,6 @@ int CameraHal::FW3A_Start_CAF()
       ret = fobj->cam_iface_2a->StartAF(fobj->cam_iface_2a->pPrivateHandle);
     }
 
-#ifdef FOCUS_RECT
-    focus_rect_set = 0;
-#endif
-
     isStart_FW3A_CAF = 1;
 
     LOG_FUNCTION_NAME_EXIT
@@ -210,7 +217,11 @@ int CameraHal::FW3A_Stop_CAF()
 {
     int ret, prev = isStart_FW3A_CAF;
 
+#ifdef DEBUG_LOG
+
     LOG_FUNCTION_NAME
+
+#endif
 
     if (isStart_FW3A_CAF==0) {
         LOGE("3A FW CAF is already stopped");
@@ -221,13 +232,19 @@ int CameraHal::FW3A_Stop_CAF()
     if (0 > ret) {
         LOGE("Cannot Stop CAF");
         return -1;
-    } else {
+    }
+
+#ifdef DEBUG_LOG
+     else {
         LOGE("3A FW CAF Start - success");
     }
+#endif
 
     isStart_FW3A_CAF = 0;
 
+#ifdef DEBUG_LOG
     LOG_FUNCTION_NAME_EXIT
+#endif
 
     return prev;
 }
@@ -260,10 +277,6 @@ int CameraHal::FW3A_Start_AF()
         LOGE("3A FW AF Start - success");
     }
 
-#ifdef FOCUS_RECT
-    focus_rect_set = 1;
-#endif
-
     LOG_FUNCTION_NAME_EXIT
 
     isStart_FW3A_AF = 1;
@@ -274,9 +287,13 @@ int CameraHal::FW3A_Stop_AF()
 {
     int ret, prev = isStart_FW3A_AF;
 
+#ifdef DEBUG_LOG
+
     LOG_FUNCTION_NAME
 
-    if (isStart_FW3A_AF==0) {
+#endif
+
+    if (isStart_FW3A_AF == 0) {
         LOGE("3A FW AF is already stopped");
         return isStart_FW3A_AF;
     }
@@ -286,14 +303,19 @@ int CameraHal::FW3A_Stop_AF()
     if (0 > ret) {
         LOGE("Cannot Stop AF");
         return -1;
-    } else {
+    } 
+
+#ifdef DEBUG_LOG
+    else {
         LOGE("3A FW AF Stop - success");
     }
-    
+#endif
+
     isStart_FW3A_AF = 0;
 
+#ifdef DEBUG_LOG
     LOG_FUNCTION_NAME_EXIT
-
+#endif
     return prev;
 }
 
@@ -326,11 +348,19 @@ int CameraHal::FW3A_GetSettings()
 {
     int err = 0;
 
+#ifdef DEBUG_LOG
+
     LOG_FUNCTION_NAME
+
+#endif
 
     err = fobj->cam_iface_2a->ReadSettings(fobj->cam_iface_2a->pPrivateHandle, &fobj->settings_2a);
 
+#ifdef DEBUG_LOG
+
     LOG_FUNCTION_NAME_EXIT  
+
+#endif
 
     return err;
 }
@@ -340,15 +370,6 @@ int CameraHal::FW3A_SetSettings()
     int err = 0;
 
     LOG_FUNCTION_NAME
-
-//UGLY Hack
-{
-	int prev_exp = fobj->settings_2a.ae.exposure_time;
-
-  fobj->settings_2a.ae.exposure_time = 33333;
-  err = fobj->cam_iface_2a->WriteSettings(fobj->cam_iface_2a->pPrivateHandle, &fobj->settings_2a);
-  fobj->settings_2a.ae.exposure_time = prev_exp;
-}
 
     err = fobj->cam_iface_2a->WriteSettings(fobj->cam_iface_2a->pPrivateHandle, &fobj->settings_2a);
   
@@ -365,7 +386,7 @@ static IPP_EENFAlgoDynamicParams IPPEENFAlgoDynamicParamsArray [MAXIPPDynamicPar
 };
 
 
-int CameraHal::InitIPP(int w, int h)
+int CameraHal::InitIPP(int w, int h, int fmt)
 {
     int eError = 0;
 
@@ -382,30 +403,33 @@ int CameraHal::InitIPP(int w, int h)
 		return -1;
 	}
 
-#if ( IPP_YUV422P || IPP_YUV420P_OUTPUT_YUV422I )
-	pIPP.ippconfig.numberOfAlgos=4;
-#else
-	pIPP.ippconfig.numberOfAlgos=3;
-#endif
+    if( fmt == PIX_YUV420P)
+	    pIPP.ippconfig.numberOfAlgos = 2;
+	else
+	    pIPP.ippconfig.numberOfAlgos = 3;
+
     pIPP.ippconfig.orderOfAlgos[0]=IPP_START_ID;
-    pIPP.ippconfig.orderOfAlgos[1]=IPP_YUVC_422iTO422p_ID;
-	if(mippMode == IPP_CromaSupression_Mode ){
-		pIPP.ippconfig.orderOfAlgos[2]=IPP_CRCBS_ID;
+    
+    if( fmt != PIX_YUV420P ){
+        pIPP.ippconfig.orderOfAlgos[1]=IPP_YUVC_422iTO422p_ID;
+        
+	    if(mippMode == IPP_CromaSupression_Mode ){
+		    pIPP.ippconfig.orderOfAlgos[2]=IPP_CRCBS_ID;
+	    }
+	    else if(mippMode == IPP_EdgeEnhancement_Mode){
+		    pIPP.ippconfig.orderOfAlgos[2]=IPP_EENF_ID;
+	    }
+	} else {
+	    if(mippMode == IPP_CromaSupression_Mode ){
+		    pIPP.ippconfig.orderOfAlgos[1]=IPP_CRCBS_ID;
+	    }
+	    else if(mippMode == IPP_EdgeEnhancement_Mode){
+		    pIPP.ippconfig.orderOfAlgos[1]=IPP_EENF_ID;
+	    }
 	}
-	else if(mippMode == IPP_EdgeEnhancement_Mode){
-		pIPP.ippconfig.orderOfAlgos[2]=IPP_EENF_ID;
-	}
-#if ( IPP_YUV422P || IPP_YUV420P_OUTPUT_YUV422I )
-	pIPP.ippconfig.orderOfAlgos[3]=IPP_YUVC_422pTO422i_ID;
-#endif    
+	   
     pIPP.ippconfig.isINPLACE=INPLACE_ON;   
-
-
-#if ( IPP_YUV422P || IPP_YUV420P_OUTPUT_YUV422I )
-	pIPP.outputBufferSize= w*h*2;	
-#else
 	pIPP.outputBufferSize= (w*h*3)/2;	
-#endif
 
     LOGD("IPP_SetProcessingConfiguration");
     eError = IPP_SetProcessingConfiguration(pIPP.hIPP, pIPP.ippconfig);
@@ -433,18 +457,13 @@ int CameraHal::InitIPP(int w, int h)
 		}	
 	}
     
-    LOGD("IPP_SetAlgoConfig");
-    eError = IPP_SetAlgoConfig(pIPP.hIPP, IPP_YUVC_422TO420_CREATEPRMS_CFGID, &(pIPP.YUVCcreate));
-	if(eError != 0){
-		LOGE("ERROR IPP_SetAlgoConfig");
-	}	
-#if ( IPP_YUV422P || IPP_YUV420P_OUTPUT_YUV422I ) 
-    LOGD("IPP_SetAlgoConfig");
-    IPP_SetAlgoConfig(pIPP.hIPP, IPP_YUVC_420TO422_CREATEPRMS_CFGID, &(pIPP.YUVCcreate));
-	if(eError != 0){
-		LOGE("ERROR IPP_SetAlgoConfig");
-	}	
-#endif
+    if ( fmt != PIX_YUV420P ) {
+        LOGD("IPP_SetAlgoConfig");
+        eError = IPP_SetAlgoConfig(pIPP.hIPP, IPP_YUVC_422TO420_CREATEPRMS_CFGID, &(pIPP.YUVCcreate));
+	    if(eError != 0){
+		    LOGE("ERROR IPP_SetAlgoConfig");
+	    }	
+	}
     
     LOGD("IPP_InitializeImagePipe");
     eError = IPP_InitializeImagePipe(pIPP.hIPP);
@@ -488,9 +507,9 @@ int CameraHal::InitIPP(int w, int h)
 }
 /*-------------------------------------------------------------------*/
 /**
-  * DeInitIPP() 
+  * DeInitIPP()
   *
-  * 
+  *
   *
   * @param pComponentPrivate component private data structure.
   *
@@ -517,7 +536,7 @@ int CameraHal::DeInitIPP()
 
     LOGD("IPP_Delete");
     IPP_Delete(&(pIPP.hIPP));
-    
+
     free(((char*)pIPP.iStarInArgs - PADDING_OFFSET_TEST));
     free(((char*)pIPP.iStarOutArgs - PADDING_OFFSET_TEST));
 	
@@ -549,7 +568,7 @@ int CameraHal::DeInitIPP()
     return eError;
 }
 
-int CameraHal::PopulateArgsIPP(int w, int h)
+int CameraHal::PopulateArgsIPP(int w, int h, int fmt)
 {
     int eError = 0;
     
@@ -566,7 +585,7 @@ int CameraHal::PopulateArgsIPP(int w, int h)
 	
     pIPP.iYuvcInArgs1->size = sizeof(IPP_YUVCAlgoInArgs);
     pIPP.iYuvcInArgs2->size = sizeof(IPP_YUVCAlgoInArgs);
-    
+
     pIPP.iStarOutArgs->size = sizeof(IPP_StarAlgoOutArgs);
 	if(mippMode == IPP_CromaSupression_Mode ){
     	pIPP.iCrcbsOutArgs->size = sizeof(IPP_CRCBSAlgoOutArgs);
@@ -582,19 +601,11 @@ int CameraHal::PopulateArgsIPP(int w, int h)
 	if(mippMode == IPP_CromaSupression_Mode ){
 	    pIPP.iCrcbsInArgs->inputHeight = h;
 	    pIPP.iCrcbsInArgs->inputWidth = w;	
-#if IPP_YUV422P 
-    pIPP.iCrcbsInArgs->inputChromaFormat = IPP_YUV_422P;
-#else
-	pIPP.iCrcbsInArgs->inputChromaFormat = IPP_YUV_420P;
-#endif
+	    pIPP.iCrcbsInArgs->inputChromaFormat = IPP_YUV_420P;
 	}
 
 	if(mippMode == IPP_EdgeEnhancement_Mode){
-#if IPP_YUV422P 
-    	pIPP.iEenfInArgs->inputChromaFormat = IPP_YUV_422P;
-#else
 		pIPP.iEenfInArgs->inputChromaFormat = IPP_YUV_420P;
-#endif	
 		pIPP.iEenfInArgs->inFullWidth = w;
 		pIPP.iEenfInArgs->inFullHeight = h;
 		pIPP.iEenfInArgs->inOffsetV = 0;
@@ -604,39 +615,20 @@ int CameraHal::PopulateArgsIPP(int w, int h)
 		pIPP.iEenfInArgs->inPlace = 0;
 		pIPP.iEenfInArgs->NFprocessing = 0;
     }
-	
-    pIPP.iYuvcInArgs1->inputHeight = h;
-    pIPP.iYuvcInArgs1->inputWidth = w;
-	
-#if IPP_YUV422P 
-    pIPP.iYuvcInArgs1->outputChromaFormat = IPP_YUV_422P;
-#else
-	pIPP.iYuvcInArgs1->outputChromaFormat = IPP_YUV_420P;
-#endif    
-    pIPP.iYuvcInArgs1->inputChromaFormat = IPP_YUV_422ILE;
 
-#if ( IPP_YUV422P || IPP_YUV420P_OUTPUT_YUV422I )
-    pIPP.iYuvcInArgs2->inputHeight = h;
-    pIPP.iYuvcInArgs2->inputWidth = w;
-	#if IPP_YUV422P
-    pIPP.iYuvcInArgs2->outputChromaFormat = IPP_YUV_422ILE;
-    pIPP.iYuvcInArgs2->inputChromaFormat = IPP_YUV_422P;
-	#else
-	pIPP.iYuvcInArgs2->outputChromaFormat = IPP_YUV_422ILE;
-    pIPP.iYuvcInArgs2->inputChromaFormat = IPP_YUV_420P;
-	#endif
-#endif
-  
+    if ( fmt == PIX_YUV422I ) {
+        pIPP.iYuvcInArgs1->inputChromaFormat = IPP_YUV_422ILE;
+        pIPP.iYuvcInArgs1->outputChromaFormat = IPP_YUV_420P;
+        pIPP.iYuvcInArgs1->inputHeight = h;
+        pIPP.iYuvcInArgs1->inputWidth = w;
+    }
+    
 	pIPP.iStarOutArgs->extendedError= 0;
 	pIPP.iYuvcOutArgs1->extendedError = 0;
 	if(mippMode == IPP_EdgeEnhancement_Mode)
 		pIPP.iEenfOutArgs->extendedError = 0;
 	if(mippMode == IPP_CromaSupression_Mode )	
 		pIPP.iCrcbsOutArgs->extendedError = 0;
-
-#if ( IPP_YUV422P || IPP_YUV420P_OUTPUT_YUV422I  )
-    pIPP.iYuvcOutArgs2->extendedError = 0;
-#endif
 
 	//Filling ipp status structure
     pIPP.starStatus.size = sizeof(IPP_StarAlgoStatus);
@@ -665,9 +657,8 @@ int CameraHal::PopulateArgsIPP(int w, int h)
     return eError;
 }
 
-
-int CameraHal::ProcessBufferIPP(void *pBuffer, long int nAllocLen,
-                                int EdgeEnhancementStrength, int WeakEdgeThreshold, 
+int CameraHal::ProcessBufferIPP(void *pBuffer, long int nAllocLen, int fmt,
+                                int EdgeEnhancementStrength, int WeakEdgeThreshold,
                                 int StrongEdgeThreshold, int LumaNoiseFilterStrength,
                                 int ChromaNoiseFilterStrength)
 {
@@ -718,40 +709,47 @@ int CameraHal::ProcessBufferIPP(void *pBuffer, long int nAllocLen,
 		pIPP.iOutputBufferDesc.reuseAllowed[0] = 0;
 	}
 
-
-#if ( IPP_YUV422P || IPP_YUV420P_OUTPUT_YUV422I )
-	pIPP.iInputArgs.numArgs = 4;/*be aware of the algos order*/
-#else
-	pIPP.iInputArgs.numArgs = 3;
-#endif    
-    pIPP.iInputArgs.argsArray[0] = pIPP.iStarInArgs;
-    pIPP.iInputArgs.argsArray[1] = pIPP.iYuvcInArgs1;
-	if(mippMode == IPP_CromaSupression_Mode ){
-	    pIPP.iInputArgs.argsArray[2] = pIPP.iCrcbsInArgs;
-	}
-	if(mippMode == IPP_EdgeEnhancement_Mode){    
-		pIPP.iInputArgs.argsArray[2] = pIPP.iEenfInArgs; 
-	}
-#if ( IPP_YUV422P || IPP_YUV420P_OUTPUT_YUV422I  )
-   pIPP.iInputArgs.argsArray[3] = pIPP.iYuvcInArgs2;
-#endif    
-
-#if ( IPP_YUV422P || IPP_YUV420P_OUTPUT_YUV422I )
-	pIPP.iOutputArgs.numArgs = 4;/*be aware of the algos order*/
-#else
-	pIPP.iOutputArgs.numArgs = 3;
-#endif   
-    pIPP.iOutputArgs.argsArray[0] = pIPP.iStarOutArgs;
-    pIPP.iOutputArgs.argsArray[1] = pIPP.iYuvcOutArgs1;
-	if(mippMode == IPP_CromaSupression_Mode ){
-	    pIPP.iOutputArgs.argsArray[2] = pIPP.iCrcbsOutArgs;
-	}
-	if(mippMode == IPP_EdgeEnhancement_Mode){   
-    	pIPP.iOutputArgs.argsArray[2] = pIPP.iEenfOutArgs;
-	}
-#if ( IPP_YUV422P || IPP_YUV420P_OUTPUT_YUV422I )
-   	pIPP.iOutputArgs.argsArray[3] = pIPP.iYuvcOutArgs2;
-#endif
+    if ( fmt == PIX_YUV422I){
+	    pIPP.iInputArgs.numArgs = 3;
+	    pIPP.iOutputArgs.numArgs = 3;
+	    
+        pIPP.iInputArgs.argsArray[0] = pIPP.iStarInArgs;
+        pIPP.iInputArgs.argsArray[1] = pIPP.iYuvcInArgs1;
+	    if(mippMode == IPP_CromaSupression_Mode ){
+	        pIPP.iInputArgs.argsArray[2] = pIPP.iCrcbsInArgs;
+	    }
+	    if(mippMode == IPP_EdgeEnhancement_Mode){    
+		    pIPP.iInputArgs.argsArray[2] = pIPP.iEenfInArgs; 
+	    }
+	    
+        pIPP.iOutputArgs.argsArray[0] = pIPP.iStarOutArgs;
+        pIPP.iOutputArgs.argsArray[1] = pIPP.iYuvcOutArgs1;
+        if(mippMode == IPP_CromaSupression_Mode ){
+            pIPP.iOutputArgs.argsArray[2] = pIPP.iCrcbsOutArgs;
+        }
+        if(mippMode == IPP_EdgeEnhancement_Mode){   
+        	pIPP.iOutputArgs.argsArray[2] = pIPP.iEenfOutArgs;
+        }
+	 } else {
+	    pIPP.iInputArgs.numArgs = 2;
+	    pIPP.iOutputArgs.numArgs = 2;
+	    
+        pIPP.iInputArgs.argsArray[0] = pIPP.iStarInArgs;
+	    if(mippMode == IPP_CromaSupression_Mode ){
+	        pIPP.iInputArgs.argsArray[1] = pIPP.iCrcbsInArgs;
+	    }
+	    if(mippMode == IPP_EdgeEnhancement_Mode){    
+		    pIPP.iInputArgs.argsArray[1] = pIPP.iEenfInArgs; 
+	    }
+	    
+        pIPP.iOutputArgs.argsArray[0] = pIPP.iStarOutArgs;
+        if(mippMode == IPP_CromaSupression_Mode ){
+            pIPP.iOutputArgs.argsArray[1] = pIPP.iCrcbsOutArgs;
+        }
+        if(mippMode == IPP_EdgeEnhancement_Mode){   
+        	pIPP.iOutputArgs.argsArray[1] = pIPP.iEenfOutArgs;
+        }
+    }    
    
     LOGD("IPP_ProcessImage");
 	if((pIPP.ippconfig.isINPLACE)){
@@ -771,251 +769,20 @@ int CameraHal::ProcessBufferIPP(void *pBuffer, long int nAllocLen,
 
 #endif
 
-
-#ifdef IMAGE_PROCESSING_PIPELINE_MMS
-#include "mms_ipp_cfg.h"
-
-int CameraHal::handle_alg_errors(ARM_ERROR error)
-{
-    if ( error == ARM_ERROR_FAIL) {
-        LOGE(" Algorithm error: The algorithm failed\n");
-    }
-    if ( error ==  ARM_ERROR_ATTACH_DSP) {
-        LOGE(" Algorithm error: Attaching to DSP failed\n");
-    }
-    if ( error ==  ARM_ERROR_DETACH_DSP) {
-        LOGE(" Algorithm error: Detaching from DSP failed\n");
-    }
-    if ( error ==  ARM_ERROR_NODE_INIT) {
-        LOGE(" Algorithm error: Initialization of Node failed\n");
-    }
-    if ( error ==  ARM_ERROR_NODE_DELETE) {
-        LOGE(" Algorithm error: Deleting Node failed\n");
-    }
-    if ( error ==  ARM_ERROR_DSPMSG_FAIL) {
-        LOGE(" Algorithm error: Sending MSG to DSP failed\n");
-    }
-    if ( error ==  ARM_ERROR_DSP_FAIL) {
-        LOGE(" Algorithm error: DSP returned ERROR\n");
-    }
-    if ( error ==  ARM_ERROR_NOT_ENOUGH_SPACE) {
-        LOGE(" Algorithm error: ERROR - Not enough space\n");
-    }
-    if ( error ==  ARM_ERROR_REGISTER_NODE) {
-        LOGE(" Algorithm error: ERROR when registering node with dcd\n");
-    }
-    if ( error ==  ARM_ERROR_UNREGISTER_NODE) {
-        LOGE(" Algorithm error: ERROR when unregistering node with dcd\n");
-    }
-
-    return 0;
-}
-
-int CameraHal::InitIPPMMSDefault(int w, int h)
-{
-    ARM_ERROR error;
-    pip_omap_ctrl_t pip_omap_ctrl;
-
-    error =  pip_omap_create(&pIPPMMS, 0, 0);
-
-    if (error){
-        LOGE("PIP OMAP Algorithm creation failed: ");
-        handle_alg_errors(error);
-
-        return -1;
-    } else {
-        LOGE("PIP OMAP Algorithm created successfully.");
-    }
-
-    pip_omap_ctrl.imgwidth = w;
-    pip_omap_ctrl.imgheight = h;
-    pip_omap_ctrl.input_ppln = pip_omap_ctrl.imgwidth;
-    pip_omap_ctrl.output_ppln = pip_omap_ctrl.input_ppln;
-
-    pip_omap_ctrl.padding = 0;
-    
-    pip_omap_ctrl.fir_lum_coeff = fir_lum_coeff;
-    pip_omap_ctrl.fir_lum_den = FIR_LUM_DEN;
-    pip_omap_ctrl.ee_lut_ptr = ee_lut_ptr;
-
-    pip_omap_ctrl.fir_chr_coeff = fir_chr_coeff;
-    pip_omap_ctrl.fir_chr_den = FIR_CHR_DEN;
-    pip_omap_ctrl.use_crcbdenoise = USE_CRCBDENOISE;
-    pip_omap_ctrl.denoising_thr = DENOISING_THR;
-    pip_omap_ctrl.desaturating_thr = DESATURATING_THR;
-    pip_omap_ctrl.detailpreserve = DESATURATING_THR;
-
-    error = pip_omap_control(pIPPMMS, &pip_omap_ctrl);
-
-    if (error){
-        printf("PIP OMAP Algorithm control failed: ");
-        handle_alg_errors(error);
-   
-        return -1;
-    } else {
-        printf("PIP OMAP Algorithm control successfull.");
-    }
-
-    return 0;
-}
-
-int CameraHal::InitIPPMMS(pip_omap_ctrl_t *cfg)
-{
-    ARM_ERROR error;
-    error =  pip_omap_create(&pIPPMMS, 0, 0);
-
-    if (error){
-        LOGE("PIP OMAP Algorithm creation failed: ");
-        handle_alg_errors(error);
-
-        return -1;
-    } else {
-        LOGE("PIP OMAP Algorithm created successfully.");
-    }
-
-    error = pip_omap_control(pIPPMMS, cfg);
-
-    if (error){
-        printf("PIP OMAP Algorithm control failed: ");
-        handle_alg_errors(error);
-
-        return -1;
-    } else {
-        LOGE("PIP OMAP Algorithm control successfull.");
-    }
-
-    return 0;
-}
-
-int CameraHal::DeInitIPPMMS()
-{
-    ARM_ERROR error;
-    error =  pip_omap_delete(pIPPMMS);  
-
-    if (error){
-        LOGE("PIP OMAP Algorithm delete failed: ");
-        handle_alg_errors(error);
-
-        return -1;
-    } else {
-        LOGE("PIP OMAP Algorithm deleted successfully.");
-    }
-
-    return 0;
-}
-
-int CameraHal::ProcessBufferIPPMMS(void *pBuffer)
-{
-    ARM_ERROR error;
-    error = pip_omap_process(pIPPMMS, pBuffer, pBuffer);
-
-    if (error){
-        LOGE("PIP OMAP Algorithm process failed. ");
-        handle_alg_errors(error);
-
-        return -1;
-    } else {
-        LOGE("PIP OMAP Algorithm applied successfully.");
-    }
-
-    return 0;
-}
-
-#endif
-
-
-
-					/***************/
-
-void CameraHal::drawRect(uint8_t *input, uint8_t color, int x1, int y1, int x2, int y2, int width, int height)
-{
-	int i, start_offset, end_offset;
-	int offset = 0;
-	int offset_1 = 1;;
-	int mod = 0;
-	int cb,cr;
-
-	switch (color){
-
-		case FOCUS_RECT_WHITE:
-			cb = 255;
-			cr = 255;
-			offset = 1;
-			offset_1 = 1;
-
-			break;
-		case FOCUS_RECT_GREEN:
-			cb = 0;
-			cr = 0;
-			offset = 0;
-			offset_1 = 2;
-			break;
-		case FOCUS_RECT_RED:
-			cb = 128;
-			cr = 255;
-			offset = 0;
-			offset_1 = 2;
-			break;
-
-		default:
-			cb = 255;
-			cr = 255;
-			offset = 1;
-			offset_1 = 1;
-	}
-
-	//Top Line
-	start_offset = ((width*y1) + x1)*2 + offset;
-	end_offset =  start_offset + (x2 - x1)*2 + offset;
-	for ( i = start_offset; i < end_offset; i += 2){
-		if (mod % 2)
-			*( input + i ) = cr;
-		else
-			*( input + i ) = cb;
-		mod++;
-	}
-
-	//Left Line
-	start_offset = ((width*y1) + x1)*2 + offset_1;
-	end_offset = ((width*y2) + x1)*2 + offset_1;
-	for ( i = start_offset; i < end_offset; i += 2*width){
-			*( input + i ) = cr;
-	}
-
-	mod = 0;
-
-	//Botom Line
-	start_offset = ((width*y2) + x1)*2 + offset;
-	end_offset = start_offset + (x2 - x1)*2 + offset;
-	for( i = start_offset; i < end_offset; i += 2){
-		if (mod % 2)
-			*( input + i ) = cr;
-		else
-			*( input + i ) = cb;
-		mod++;
-	}
-
-	//Right Line
-	start_offset = ((width*y1) + x1 + (x2 - x1))*2 + offset_1;
-	end_offset = ((width*y2) + x1 + (x2 - x1))*2 + offset_1;
-	for ( i = start_offset; i < end_offset; i += 2*width){
-		*( input + i ) = cr;
-	}
-}
-
 int CameraHal::ZoomPerform(int zoom)
 {
     struct v4l2_crop crop;
     int fwidth, fheight;
-    int zoom_left,zoom_top,zoom_width, zoom_height,w,h;
+    int zoom_left,zoom_top,zoom_width, zoom_height, w, h;
     int ret;
 
     if (zoom < 1) 
        zoom = 1;
     if (zoom > 7)
        zoom = 7;
-
+    
     mParameters.getPreviewSize(&w, &h);
+
     fwidth = w/zoom;
     fheight = h/zoom;
     zoom_width = ((int) fwidth) & (~3);
@@ -1044,6 +811,8 @@ int CameraHal::ZoomPerform(int zoom)
 
 /************/
 #ifndef ICAP
+
+//TODO: Update the normal in according the PPM Changes
 int CameraHal::CapturePicture(){
 
     int image_width, image_height;
@@ -1067,7 +836,7 @@ int CameraHal::CapturePicture(){
     void* snapshot_buffer;
     int ipp_reconfigure=0;
     int ippTempConfigMode;
-    int jpegFormat = YUV422;
+    int jpegFormat = PIX_YUV422I;
 
     LOG_FUNCTION_NAME
 
@@ -1222,7 +991,7 @@ int CameraHal::CapturePicture(){
     snapshot_buffer = mOverlay->getBufferAddress( (void*)0 );
     LOGD("VPP scale_process() \n");
     err = scale_process(yuv_buffer, image_width, image_height,
-                         snapshot_buffer, preview_width, preview_height);
+                         snapshot_buffer, preview_width, preview_height, 0, jpegFormat, mZoomTarget);
     if( err ) LOGE("scale_process() failed");
     else LOGD("scale_process() OK");
 
@@ -1330,11 +1099,11 @@ int CameraHal::CapturePicture(){
 	}
 	 
 	#if ( IPP_YUV422P || IPP_YUV420P_OUTPUT_YUV422I )
-		jpegFormat = YUV422;        
+		jpegFormat = PIX_YUV422I;        
 		LOGD("YUV422 !!!!");
 	#else
 		yuv_len=  ((image_width * image_height *3)/2);
-        jpegFormat = YUV420;
+        jpegFormat = PIX_YUV420P;
 		LOGD("YUV420 !!!!");
     #endif
 		
@@ -1396,7 +1165,7 @@ if(mJpegPictureCallback) {
 }
 #endif
 
-void CameraHal::PPM(char* str){
+void CameraHal::PPM(const char* str){
 #if PPM_INSTRUMENTATION
 	gettimeofday(&ppm, NULL); 
 	ppm.tv_sec = ppm.tv_sec - ppm_start.tv_sec; 
@@ -1406,7 +1175,7 @@ void CameraHal::PPM(char* str){
 #endif
 }
 
-void CameraHal::PPM(char* str, struct timeval* ppm_first){
+void CameraHal::PPM(const char* str, struct timeval* ppm_first){
 #if PPM_INSTRUMENTATION
 	gettimeofday(&ppm, NULL); 
 	ppm.tv_sec = ppm.tv_sec - ppm_first->tv_sec; 

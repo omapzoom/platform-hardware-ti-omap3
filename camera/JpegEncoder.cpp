@@ -38,7 +38,7 @@
 #define PRINTF LOGD
 
 #define JPEG_ENCODER_DUMP_INPUT_AND_OUTPUT 0
-#define OPTIMIZE 0
+#define OPTIMIZE 1
 
 #if JPEG_ENCODER_DUMP_INPUT_AND_OUTPUT
 	int eOutputCount = 0;
@@ -78,6 +78,7 @@ JpegEncoder::JpegEncoder()
     pInBuffHead = NULL;
     pOutBuffHead = NULL;
     semaphore = NULL;
+    pOMXHandle = NULL;
     semaphore = (sem_t*)malloc(sizeof(sem_t)) ;
     sem_init(semaphore, 0x00, 0x00);
 }
@@ -86,7 +87,7 @@ JpegEncoder::~JpegEncoder()
 {
     OMX_ERRORTYPE eError = OMX_ErrorNone;
 #if OPTIMIZE
-    if(iLastState || iState){
+    if( ( iLastState || iState ) && ( NULL != pOMXHandle ) ){
         eError = OMX_SendCommand(pOMXHandle,OMX_CommandStateSet, OMX_StateIdle, NULL);
         if ( eError != OMX_ErrorNone ) {
             PRINTF("\nError from SendCommand-Idle(nStop) State function\n");
