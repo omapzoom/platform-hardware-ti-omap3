@@ -119,6 +119,8 @@ CameraHal::CameraHal()
 
     CameraConfigure();
 
+    allocatePictureBuffer(PICTURE_WIDTH, PICTURE_HEIGHT);
+
 #ifdef FW3A
     FW3A_Create();
 #endif
@@ -273,14 +275,6 @@ CameraHal::~CameraHal()
     }
 
     ICaptureDestroy();
-
-    {
-        Mutex::Autolock lock(mBufferLock);
-        
-        if ( ( !mBufferInUse ) && ( NULL != mPictureHeap.get() ) )
-            mPictureHeap.clear();
-    
-    }
 
 #ifdef FW3A
     FW3A_Destroy();
@@ -664,11 +658,6 @@ void CameraHal::previewThread()
                 allocatePictureBuffer(PICTURE_WIDTH, PICTURE_HEIGHT);
  
 #endif
-                
-                {
-                    Mutex::Autolock lock(mBufferLock);
-                    mBufferInUse = false;
-                }
 
                 mPreviewRunning = true;
 
@@ -1240,7 +1229,7 @@ int  CameraHal::ICapturePerform()
     yuv_len = mPictureLength;
 
     iobj->proc.img_buf[0].start = yuv_buffer; 
-    iobj->proc.img_buf[0].length = yuv_len; 
+    iobj->proc.img_buf[0].length = iobj->cfg.sizeof_img_buf;
     iobj->proc.img_bufs_count = 1;
 
 #if DEBUG_LOG
@@ -1342,11 +1331,6 @@ int  CameraHal::ICapturePerform()
 	LOGD("SENDING MESSAGE TO PROCESSING THREAD");
 
 #endif
-
-    {
-        Mutex::Autolock lock(mBufferLock);
-        mBufferInUse = true;
-    }
 	
 	procMessage[0] = PROC_THREAD_PROCESS;
 	procMessage[1] = iobj->proc.out_img_w;
@@ -1580,12 +1564,17 @@ void CameraHal::procThread()
     void *yuv_buffer, *outBuffer, *PictureCallbackCookie;
     bool switchBuffer = false;
 	
+	//debug
+	sp<MemoryHeapBase> tmpHeap;
+	int tmpLength;
+	void *tmpBuffer;
+
 	max_fd = procPipe[0] + 1;
 
 	FD_ZERO(&descriptorSet);
 	FD_SET(procPipe[0], &descriptorSet);
 
-    mJPEGLength  = PICTURE_WIDTH*PICTURE_HEIGHT*2 + ((2*PAGE) - 1);
+    mJPEGLength  = PICTURE_WIDTH*PICTURE_HEIGHT + ((2*PAGE) - 1);
     mJPEGLength &= ~((2*PAGE) - 1);
     mJPEGLength  += 2*PAGE;
     mJPEGPictureHeap = new MemoryHeapBase(mJPEGLength);
@@ -1594,6 +1583,16 @@ void CameraHal::procThread()
     base = (base + 0xfff) & 0xfffff000;
     mJPEGOffset = base - (unsigned long) mJPEGPictureHeap->getBase();
     mJPEGBuffer = (void *) base;
+
+    //temporary
+    tmpLength  = PICTURE_WIDTH*PICTURE_HEIGHT*2 + ((2*PAGE) - 1);
+    tmpLength &= ~((2*PAGE) - 1);
+    tmpLength  += 2*PAGE;
+    tmpHeap = new MemoryHeapBase(tmpLength);
+
+    base = (unsigned long) tmpHeap->getBase();
+    base = (base + 0xfff) & 0xfffff000;
+    tmpBuffer = (void *) base;
 
 	while(1){
 
@@ -1659,7 +1658,7 @@ void CameraHal::procThread()
 
 #endif
 
-		            err = scale_process(yuv_buffer, capture_width, capture_height, outBuffer, image_width, image_height, image_rotation, pixelFormat, image_zoom);
+		            err = scale_process(yuv_buffer, capture_width, capture_height, tmpBuffer, image_width, image_height, image_rotation, pixelFormat, image_zoom);
 
 #ifdef DEBUG_LOG
 
@@ -1672,6 +1671,8 @@ void CameraHal::procThread()
 #endif
 
                     switchBuffer = true;
+
+#if 0
                     void *tmpBuffer = outBuffer;
                     outBuffer = yuv_buffer;
                     yuv_buffer = (unsigned char *)tmpBuffer;
@@ -1696,6 +1697,7 @@ void CameraHal::procThread()
                     
                     PictureBuffer.clear();
                     PictureBuffer = new MemoryBase(PictureHeap, yuv_offset, yuv_len);
+#endif
                 }
 #else
                 image_width = capture_width;
@@ -1769,15 +1771,24 @@ void CameraHal::procThread()
                     LOGD("Calling ProcessBufferIPP(buffer=%p , len=0x%x)", yuv_buffer, yuv_len);
 
 #endif
-		
-		            
-		            err = ProcessBufferIPP(yuv_buffer, yuv_len,
+
+                    if( switchBuffer) {
+		                err = ProcessBufferIPP(tmpBuffer, tmpLength,
+		                            pixelFormat,
+				                    ipp_ee_q,
+				                    ipp_ew_ts,
+				                    ipp_es_ts,
+				                    ipp_luma_nf,
+				                    ipp_chroma_nf);
+				    } else {
+		                err = ProcessBufferIPP(yuv_buffer, yuv_len,
 		                            pixelFormat,
 				                    ipp_ee_q,
 				                    ipp_ew_ts,
 				                    ipp_es_ts, 
 				                    ipp_luma_nf,
 				                    ipp_chroma_nf);
+				    }
 		            if( err )
 			            LOGE("ERROR ProcessBufferIPP() failed");		   
 
@@ -1806,7 +1817,6 @@ void CameraHal::procThread()
 	                }
 	                
 	                pixelFormat = PIX_YUV420P;
-	                yuv_len = ((image_width * image_height *3)/2);
 	            }
     
 #endif
@@ -1818,17 +1828,25 @@ void CameraHal::procThread()
 
 	            PPM("BEFORE JPEG Encode Image");
 	            	
-	            LOGD(" outbuffer = %p, jpegSize = %d, yuv_buffer = %p, yuv_len = %d, image_width = %d, image_height = %d, quality = %d, ippMode =%d", outBuffer , jpegSize, yuv_buffer, yuv_len, image_width, image_height, jpegQuality, ippMode);
+	            LOGD(" outbuffer = %p, jpegSize = %d, yuv_buffer = %p, yuv_len = %d, image_width = %d, image_height = %d, quality = %d, ippMode =%d", outBuffer , jpegSize, tmpBuffer/*yuv_buffer*/, mJPEGLength/*yuv_len*/, image_width, image_height, jpegQuality, ippMode);
 
 #endif
 
-                if (!( jpegEncoder->encodeImage((uint8_t *)outBuffer , jpegSize, yuv_buffer, yuv_len,
-                                             image_width, image_height, jpegQuality, 1)))
-                {        
-                    err = -1;
-                    LOGE("JPEG Encoding failed");
+                if( switchBuffer ) {
+                    if (!( jpegEncoder->encodeImage((uint8_t *)outBuffer , jpegSize, tmpBuffer, tmpLength,
+                                                 image_width, image_height, jpegQuality, pixelFormat)))
+                    {
+                        err = -1;
+                        LOGE("JPEG Encoding failed");
+                    }
+                } else {
+                    if (!( jpegEncoder->encodeImage((uint8_t *)outBuffer , jpegSize, yuv_buffer, yuv_len,
+                                                 image_width, image_height, jpegQuality, pixelFormat)))
+                    {
+                        err = -1;
+                        LOGE("JPEG Encoding failed");
+                    }
                 }
-
 #ifdef DEBUG_LOG
 
                 PPM("AFTER JPEG Encode Image");
@@ -1838,6 +1856,11 @@ void CameraHal::procThread()
                 JPEGPictureMemBase = new MemoryBase(JPEGPictureHeap, offset, jpegEncoder->jpegSize);
 #endif
 
+#if PPM_INSTRUMENTATION
+
+	            PPM("Shot to Save", &ppm_receiveCmdToTakePicture);
+
+#endif
                 if(JpegPictureCallback) {
 
 #if JPEG
@@ -1851,11 +1874,6 @@ void CameraHal::procThread()
 #endif
 
                 }
-#if PPM_INSTRUMENTATION
-
-	            PPM("Shot to Save", &ppm_receiveCmdToTakePicture);
-
-#endif
 
 #ifdef DEBUG_LOG
 
@@ -1866,10 +1884,8 @@ void CameraHal::procThread()
                 PictureBuffer.clear();
                 JPEGPictureMemBase.clear();
                 
-                if( switchBuffer )
-                    JPEGPictureHeap.clear();
-                else
-                    PictureHeap.clear();
+                PictureHeap->dispose();
+                PictureHeap.clear();
 
                 switchBuffer = false;
 
@@ -1886,7 +1902,10 @@ void CameraHal::procThread()
 			} else if( procMessage[0] == PROC_THREAD_EXIT ) {
 				LOGD("PROC_THREAD_EXIT_RECEIVED");
 				
+				mJPEGPictureHeap->dispose();
 				mJPEGPictureHeap.clear();
+				tmpHeap->dispose();
+				tmpHeap.clear();
 				
 				break;
 			}
@@ -1906,7 +1925,7 @@ int CameraHal::allocatePictureBuffer(size_t length)
 
     mPictureLength  = length + ((2*PAGE) - 1);
     mPictureLength &= ~((2*PAGE) - 1);
-    mPictureLength  += 2*PAGE;
+    mPictureLength  += 2*PAGE ;
     mPictureHeap = new MemoryHeapBase(mPictureLength);
 
     base = (unsigned long) mPictureHeap->getBase();
@@ -2438,40 +2457,6 @@ status_t CameraHal::setParameters(const CameraParameters &params)
         return -1;
     }
     LOGD("Picture Size by App %d x %d", w, h);
-    
-    {
-        Mutex::Autolock lock(mBufferLock);
-        
-        if ( ( !mBufferInUse ) && ( NULL != mPictureHeap.get() ) )
-            mPictureHeap.clear();
-    
-    }
-
-#ifdef ICAP_EXPERIMENTAL
-
-        iobj->cfg.image_width   = w;
-        iobj->cfg.image_height  = h;
-
-        status = iobj->lib.GetBufferSize(iobj->lib_private, &iobj->cfg);
-    
-        if( ICAPTURE_FAIL == status ) {
-            LOGE ("ICapture GetBufferSize function failed");
-            
-            return -1;
-        }
-        
-        allocatePictureBuffer(iobj->cfg.sizeof_img_buf);
-
-#else
-        
-        allocatePictureBuffer(PICTURE_WIDTH, PICTURE_HEIGHT);
- 
-#endif
-
-    {
-        Mutex::Autolock lock(mBufferLock);
-        mBufferInUse = false;
-    }
 
     framerate = params.getPreviewFrameRate();
     LOGD("FRAMERATE %d", framerate);

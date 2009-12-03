@@ -88,8 +88,8 @@ extern "C" {
 #define VIDEO_DEVICE        "/dev/video5"
 #define MIN_WIDTH           128
 #define MIN_HEIGHT          96
-#define PICTURE_WIDTH   3280 /* 5mp - 2560. 8mp - 3280 */ /* Make sure it is a multiple of 16. */
-#define PICTURE_HEIGHT  2464 /* 5mp - 2048. 8mp - 2464 */ /* Make sure it is a multiple of 16. */
+#define PICTURE_WIDTH   /*3280*/ 4000/* 5mp - 2560. 8mp - 3280 */ /* Make sure it is a multiple of 16. */
+#define PICTURE_HEIGHT  /*2464*/ 3000 /* 5mp - 2048. 8mp - 2464 */ /* Make sure it is a multiple of 16. */
 #define PREVIEW_WIDTH 176
 #define PREVIEW_HEIGHT 144
 #define PIXEL_FORMAT           V4L2_PIX_FMT_UYVY
@@ -374,12 +374,11 @@ private:
     int isStart_JPEG;
     int FW3A_AF_TimeOut;
 	    
-    mutable Mutex mLock, mBufferLock;
+    mutable Mutex mLock;
     CameraParameters mParameters;
     sp<MemoryHeapBase> mPictureHeap, mJPEGPictureHeap;
     int mPictureOffset, mJPEGOffset, mJPEGLength, mPictureLength;
     void *mYuvBuffer, *mJPEGBuffer;
-    bool mBufferInUse;
     int  mPreviewFrameSize;
     shutter_callback mShutterCallback;
     raw_callback mRawPictureCallback;
