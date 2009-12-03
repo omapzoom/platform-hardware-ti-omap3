@@ -1294,12 +1294,12 @@ int  CameraHal::ICapturePerform()
 
 	PPM("After vpp downscales:");
 
+#endif
+
 	if( status ) 
 	    LOGE("scale_process() failed");
 	else 
 	    LOGD("scale_process() OK");
-
-#endif
 
 #if PPM_INSTRUMENTATION
 
