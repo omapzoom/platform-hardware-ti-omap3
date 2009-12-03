@@ -1281,7 +1281,7 @@ int  CameraHal::ICapturePerform()
 
 	snapshot_buffer = (void*)data->ptr;
 
-#ifdef DEBUG_LOG
+#ifdef PPM_INSTRUMENTATION
 
 	PPM("Before vpp downscales:"); 
     
@@ -1326,9 +1326,9 @@ int  CameraHal::ICapturePerform()
 
 #endif //VPP
 
-#ifdef DEBUG_LOG
+#ifdef PPM_INSTRUMENTATION
 
-	LOGD("SENDING MESSAGE TO PROCESSING THREAD");
+	PPM("SENDING MESSAGE TO PROCESSING THREAD");
 
 #endif
 	
