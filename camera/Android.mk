@@ -88,5 +88,19 @@ endif
 
 ################################################
 
+include $(CLEAR_VARS)
+
+LOCAL_SRC_FILES := CameraHalTest.cpp
+
+LOCAL_C_INCLUDES := hardware/ti/omap3/liboverlay
+
+LOCAL_SHARED_LIBRARIES := libcamera
+
+LOCAL_MODULE := CameraHalTest
+
+include $(BUILD_EXECUTABLE)
+
+################################################
+
 endif
 
