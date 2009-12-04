@@ -26,7 +26,6 @@
 #include <signal.h>
 #include <string.h>
 #include <stdarg.h>
-#include <unistd.h>
 #include <pthread.h>
 #include <stdlib.h>
 #include <limits.h>
@@ -42,22 +41,25 @@
 #include <getopt.h>
 
 /* stack includes */
-#include <fm_rx.h>
-#include <fm_tx.h>
-#include <fmc_debug.h>
+#include "fm_rx.h"
+#include "fm_tx.h"
+#include "fmc_debug.h"
 #include "fmc_core.h"
 #include "fmc_defs.h"
 
-#ifdef ANDROID
-/* lib_alsa ALSA Include */
-#include "asoundlib.h"
-#endif
 
 /* local app */
 #include "fm_trace.h"
 #include "fmc_common.h"
 #include "fm_app.h"
 
+#ifdef ANDROID
+/* lib_alsa ALSA Include */
+#include "asoundlib.h"
+#endif
+
+
+//FMC_LOG_SET_MODULE(FMC_LOG_MODULE_FMRX)
 /* transient stage */
 typedef FmcStatus fm_status;
 typedef FmRxStatus fm_rx_status;
@@ -77,6 +79,7 @@ static FMC_INT 		g_fmapp_seek_rssi;
 static int 			g_fmapp_startup_script_fd = -1;
 static char 		g_fmapp_power_mode;
 static char 		g_fmapp_tx_transission_mode;
+static char 		g_fmapp_rx_audio_routing_mode;
 static char 		g_fmapp_now_initializing;
 static FmRxCmdType 	g_fmapp_rds;
 static FMC_UINT 		g_fmapp_mute_mode;
@@ -99,8 +102,13 @@ static FmTxRdsTransmittedGroupsMask g_fmapp_tx_rds_transmitted_groups_mask;
 static FmcRdsMusicSpeechFlag g_fmapp_tx_music_speech_flag;
 static FmRxCmdType	g_fmapp_audio;
 
-fm_status set_fmapp_audio_routing(fm_rx_context_s *);
-fm_status unset_fmapp_audio_routing(fm_rx_context_s *);
+extern int gMcpLogEnabled;
+extern int gMcpLogToStdout;
+extern char gMcpLogFileName[];
+extern int gMcpLogToUdpSocket;
+extern char gMcpLogUdpTargetAddress[];
+extern unsigned long gMcpLogUdpTargetPort ;
+extern int gMcpLogToFile;
 
 #define STATUS_DBG_STR(x)						\
 		g_fmapp_rxtx_mode == FMAPP_TX_MODE ?			\
@@ -109,6 +117,10 @@ fm_status unset_fmapp_audio_routing(fm_rx_context_s *);
 #ifndef min
 #define min(a,b)            (((a) < (b)) ? (a) : (b))
 #endif
+
+fm_status set_fmapp_audio_routing(fm_rx_context_s *);
+fm_status unset_fmapp_audio_routing(fm_rx_context_s *);
+
 
 void validate_uint_boundaries(FMC_UINT *variable, FMC_UINT minimum, FMC_UINT maximum)
 {
@@ -141,10 +153,11 @@ static void fmapp_initialize_global_status(void)
 	g_fmapp_mute_mode = FMC_NOT_MUTE;
 	g_fmapp_emphasis_filter = FMC_EMPHASIS_FILTER_50_USEC;
 	g_fmapp_rfmute_mode = FM_RX_RF_DEPENDENT_MUTE_ON;
-	g_fmapp_stereo_mode = FM_RX_STEREO_MODE;
+	g_fmapp_stereo_mode = FM_RX_MONO_MODE;
 	g_fmapp_af_mode = FM_RX_RDS_AF_SWITCH_MODE_ON;
 	g_fmapp_now_initializing = 0;
 	g_fmapp_tx_transission_mode = 0;
+	g_fmapp_rx_audio_routing_mode = 0;
 	g_fmapp_tx_rds_transission_mode =  FMC_RDS_TRANSMISSION_MANUAL;
 	g_fmapp_tx_rds_text_repertoire = FMC_RDS_REPERTOIRE_G0_CODE_TABLE;
 	g_fmapp_tx_rds_ps_display_mode = FMC_RDS_PS_DISPLAY_MODE_STATIC;
@@ -407,9 +420,7 @@ static void fmapp_display_stop_seek(FMC_U32 frequency)
 {
 	FMAPP_BEGIN();
 
-	float freq = ((float)frequency) / 1000;
-
-	FMAPP_MSG("Seek stopped at %2.1f FM", freq);
+	FMAPP_MSG("Seek stopped at %u FM", frequency);
 
 	FMAPP_END();
 }
@@ -418,13 +429,7 @@ static void fmapp_display_seek(FMC_U32 frequency, fm_status status)
 {
 	FMAPP_BEGIN();
 
-	float freq = ((float)frequency) / 1000;
-
-	if (status == FM_RX_STATUS_SEEK_REACHED_BAND_LIMIT ||
-					status == FM_RX_STATUS_SEEK_STOPPED)
-		FMAPP_MSG("%s at %2.1f FM", STATUS_DBG_STR(status), freq);
-	else
-		FMAPP_MSG("Seeked to %2.1f FM", freq);
+	FMAPP_MSG("Seeked to %u FM", frequency);
 
 	FMAPP_END();
 }
@@ -433,10 +438,9 @@ static void fmapp_radio_tuned_handler(FmcFreq frequency)
 {
 	FMAPP_BEGIN();
 
-	float freq = ((float)frequency) / 1000;
 	FMAPP_TRACE("freq tuned to %u", frequency);
 
-	FMAPP_MSG("Tuned to %2.1f FM", freq);
+	FMAPP_MSG("Tuned to %u FM", frequency);
 
 	FMAPP_END();
 }
@@ -546,11 +550,11 @@ static void fmapp_tx_cmd_done_handler(const fm_tx_event_s *event)
 		break;
 
 	case FM_TX_CMD_TUNE:
-		FMAPP_MSG("Set frequency to %2.1f FM", ((float)value)/1000);
+		FMAPP_MSG("Set frequency to %d FM", value);
 		break;
 
 	case FM_TX_CMD_GET_TUNED_FREQUENCY:
-		FMAPP_MSG("Tuned to frequency %2.1f FM", ((float)value)/1000);
+		FMAPP_MSG("Tuned to frequency %d FM", value);
 		break;
 
 	case FM_TX_CMD_SET_MONO_STEREO_MODE:
@@ -741,8 +745,8 @@ static void fmapp_rx_cmd_done_handler(fm_rx_status status, FmRxCmdType cmd, FMC_
 						cmd,
 						STATUS_DBG_STR(status),
 						value);
-	if (status) {
-		FMAPP_ERROR("%s completed with error: %s", FMC_DEBUG_FmRxCmdStr(cmd), STATUS_DBG_STR(status));
+	if (status != FM_RX_STATUS_SUCCESS && cmd != FM_RX_CMD_SEEK && cmd != FM_RX_CMD_STOP_SEEK) {
+		FMAPP_ERROR("%s completed with error: %s(%d)", FMC_DEBUG_FmRxCmdStr(cmd), STATUS_DBG_STR(status),status);
 		goto out;
 	}
 
@@ -776,7 +780,6 @@ static void fmapp_rx_cmd_done_handler(fm_rx_status status, FmRxCmdType cmd, FMC_
 	case FM_RX_CMD_SET_MUTE_MODE:
 		fmapp_display_mute_mode(g_fmapp_mute_mode);
 		break;
-
 	case FM_RX_CMD_GET_MUTE_MODE:
 		fmapp_display_mute_mode(value);
 		break;
@@ -969,19 +972,6 @@ static void fmapp_radio_text_handler(FMC_BOOL resetDisplay, FMC_UINT len,
 	FMC_UNUSED_PARAMETER(resetDisplay);
 	FMC_UNUSED_PARAMETER(startIndex);
 
-/*	if (!erase) {
-		offset = strlen(g_fmapp_radio_text);
-		g_fmapp_radio_text[offset] = ' ';
-		offset++;
-	}
-
-	how_much = min(sizeof(g_fmapp_radio_text) - startIndex - 1, len);
-
-	memcpy(g_fmapp_radio_text+startIndex, msg, how_much);
-
-	if (resetDisplay)
-		g_fmapp_radio_text[startIndex + how_much] = '\0';*/
-
 	fmapp_display_generic_str("RDS Text: ", msg, len);
 
 	FMAPP_END();
@@ -1095,7 +1085,8 @@ void fmapp_rx_callback(const fm_rx_event_s *event)
 		break;
 
 	case FM_RX_EVENT_RAW_RDS:
-		FMAPP_MSG("RDS group data is received");
+		/* This message is too intensive on the screen... */
+		/* FMAPP_MSG("RDS group data is received"); */
 		break;
 
 	case FM_RX_EVENT_AUDIO_PATH_CHANGED:
@@ -1169,8 +1160,11 @@ fm_status init_rx_stack(fm_rx_context_s  **fm_context)
 {
 	fm_status ret = FMC_STATUS_SUCCESS;
 	FMAPP_BEGIN();
-	set_fmapp_audio_routing(fm_context);
+
 	FMAPP_MSG("Powering on FM RX... (this might take awhile)");
+
+	/* Configure the Analog Loopback settings */
+	set_fmapp_audio_routing(fm_context);
 
 	ret = FM_RX_Init();
 	if (ret) {
@@ -1212,15 +1206,18 @@ fm_status deinit_rx_stack(fm_rx_context_s **fm_context)
 {
 	FmRxStatus ret = FMC_STATUS_SUCCESS;
 	FMAPP_BEGIN();
-	unset_fmapp_audio_routing(fm_context);
+
 	g_fmapp_now_initializing = 0;
+
+	/* Revert the analog loopback settings */
+	unset_fmapp_audio_routing(fm_context);
 
 	/* power off FM core */
 	ret = FM_RX_Disable(*fm_context);
 	if (ret != FMC_STATUS_PENDING && ret != FMC_STATUS_SUCCESS)
 		FMAPP_ERROR("failed to disable FM RX stack context (%s)", STATUS_DBG_STR(ret));
 
-	sleep(2);
+	sleep(4);
 
 	/* deinit FM stack */
 	ret = FM_RX_Destroy(fm_context);
@@ -1711,20 +1708,14 @@ fm_status fmapp_set_frequency(void *fm_context, char interactive,
 							char *cmd, int *index)
 {
 	fm_status ret = FMC_STATUS_SUCCESS;
-	float user_freq;
+	int user_freq;
 	char *endp;
 	int progress;
 	FMAPP_BEGIN();
 
-	if (interactive == FMAPP_INTERACTIVE)
-		sscanf(cmd, "%f", &user_freq);
-	else /* FMAPP_BATCH */ {
-		user_freq = strtod(cmd + 1, &endp);
-		progress = endp - (cmd + 1);
-		*index += progress;
-	}
+	sscanf(cmd, "%d", &user_freq);
 
-	g_fmapp_freq = rint(user_freq * 1000);
+	g_fmapp_freq = user_freq;
 
 	FMAPP_TRACE("freq tuning to %u", g_fmapp_freq);
 
@@ -1759,7 +1750,7 @@ fm_status fmapp_set_rssi_threshold(fm_rx_context_s *fm_context, char interactive
 		*index += progress;
 	}
 
-	validate_int_boundaries(&g_fmapp_seek_rssi, -16, 15);
+	validate_int_boundaries(&g_fmapp_seek_rssi, 1, 127);
 
 	FMAPP_TRACE("setting rssi to %d", g_fmapp_seek_rssi);
 
@@ -1883,7 +1874,6 @@ fm_status fmapp_increase_volume(fm_rx_context_s *fm_context)
 
 	ret = FM_RX_SetVolume(fm_context, g_fmapp_volume);
 	if (ret != FMC_STATUS_PENDING && ret != FMC_STATUS_SUCCESS)
-// && ret != FM_STATUS_PENDING_UPDATE_CMD_PARAMS)
 		FMAPP_ERROR("failed to increase volume (%s)",
 							STATUS_DBG_STR(ret));
 	else
@@ -1905,7 +1895,6 @@ fm_status fmapp_decrease_volume(fm_rx_context_s *fm_context)
 
 	ret = FM_RX_SetVolume(fm_context, g_fmapp_volume);
 	if (ret != FMC_STATUS_PENDING && ret != FMC_STATUS_SUCCESS)
-// && ret !=FM_STATUS_PENDING_UPDATE_CMD_PARAMS)
 		FMAPP_ERROR("failed to decrease volume (%s)",
 							STATUS_DBG_STR(ret));
 	else
@@ -2104,7 +2093,6 @@ fm_status fmapp_rx_seek(fm_rx_context_s *fm_context, unsigned char command)
 
 	ret = FM_RX_Seek(fm_context, direction);
 	if (ret != FMC_STATUS_PENDING && ret != FMC_STATUS_SUCCESS)
-// && ret != FM_STATUS_PENDING_UPDATE_CMD_PARAMS && ret != FMC_STATUS_SUCCESS && ret != FM_STATUS_FAILED_ALREADY_PENDING)
 		FMAPP_ERROR("failed to set seek mode (%s)", STATUS_DBG_STR(ret));
 	else
 		ret = FMC_STATUS_SUCCESS;
@@ -2691,6 +2679,33 @@ fm_status fmapp_tx_write_rds_raw_data(fm_tx_context_s *fm_context, char interact
 	return ret;
 }
 
+fm_status fmapp_enable_rx_audio_routing(fm_rx_context_s *fm_context)
+{
+	fm_status ret = FMC_STATUS_FAILED;
+	FMAPP_BEGIN();
+
+	g_fmapp_rx_audio_routing_mode = (g_fmapp_rx_audio_routing_mode ? 0 : 1);
+
+	if (g_fmapp_rx_audio_routing_mode) {
+		ret = FM_RX_EnableAudioRouting(fm_context);
+		if (ret != FMC_STATUS_PENDING && ret != FMC_STATUS_SUCCESS)
+			FMAPP_ERROR("failed to EnableAudioRouting: %s",
+							FMC_DEBUG_FmTxStatusStr(ret));
+		else
+			ret = FMC_STATUS_SUCCESS;
+	} else {
+		ret = FM_RX_DisableAudioRouting(fm_context);
+		if (ret != FMC_STATUS_PENDING && ret != FMC_STATUS_SUCCESS)
+			FMAPP_ERROR("failed to DisableAudioRouting: %s",
+							FMC_DEBUG_FmTxStatusStr(ret));
+		else
+			ret = FMC_STATUS_SUCCESS;
+	}
+
+	FMAPP_END();
+	return ret;
+}
+
 fm_status fmapp_change_tx_transmission_mode(fm_tx_context_s *fm_context)
 {
 	fm_status ret = FMC_STATUS_FAILED;
@@ -2699,7 +2714,6 @@ fm_status fmapp_change_tx_transmission_mode(fm_tx_context_s *fm_context)
 	g_fmapp_tx_transission_mode = (g_fmapp_tx_transission_mode ? 0 : 1);
 
 	if (g_fmapp_tx_transission_mode) {
-		property_set("route.stream.to", "fm");
 		ret = FM_TX_StartTransmission(fm_context);
 		if (ret != FMC_STATUS_PENDING && ret != FMC_STATUS_SUCCESS)
 			FMAPP_ERROR("failed to start TX transmission: %s",
@@ -2734,8 +2748,6 @@ fm_status fmapp_init_stack(void  **fm_context)
 	else
 		ret = FMC_STATUS_SUCCESS;
 
-	if (set_fm_chip_enable(1) < 0)
-		ret = FMC_STATUS_FAILED;
 	FMAPP_END();
 	return ret;
 }
@@ -2745,9 +2757,6 @@ fm_status fmapp_deinit_stack(void  **fm_context)
 	fm_status ret = FMC_STATUS_FAILED;
 	FMAPP_BEGIN();
 
-	property_set("route.stream.to", "default");
-	sleep(1);
-
 	if (g_fmapp_rxtx_mode == FMAPP_RX_MODE)
 		ret = deinit_rx_stack((fm_rx_context_s **) fm_context);
 	else
@@ -2756,8 +2765,6 @@ fm_status fmapp_deinit_stack(void  **fm_context)
 		FMAPP_ERROR("failed to deinitialize FM stack (%s)",
 						STATUS_DBG_STR(ret));
 
-	if (set_fm_chip_enable(0) < 0)
-		ret = FMC_STATUS_FAILED;
 	FMAPP_END();
 	return ret;
 }
@@ -2804,7 +2811,8 @@ void fmapp_show_rx_functionality(void (*printer)(const char *msg))
 	printer("Available FM RX Commands:");
 	printer("p power on/off");
 	printer("* switch to FM TX (power must be off)");
-	printer("f <freq> tune to freq");
+	printer("f <freq> tune to freq (e.g. f 99000)");
+	printer("t turns audio on/off");
 	printer("gf get frequency");
 	printer("gr get rssi level");
 	printer("r turns RDS on/off");
@@ -2835,7 +2843,7 @@ void fmapp_show_rx_functionality(void (*printer)(const char *msg))
 	printer("< seek down");
 	printer("> seek up");
 	printer("| stop seek");
-	printer("? <(-16)-(15)> set RSSI threshold");
+	printer("? <1-127> set RSSI threshold");
 	printer("g? get rssi threshold");
 	printer("! sleep one second (useful in script mode)");
 	printer("q quit");
@@ -2847,7 +2855,7 @@ void fmapp_show_tx_functionality(void (*printer)(const char *msg))
 	printer("Available FM TX Commands:");
 	printer("p power on/off");
 	printer("* switch to FM RX (power must be off)");
-	printer("f <freq> tune to freq");
+	printer("f <freq> tune to freq (e.g. f 99000)");
 	printer("gf get frequency");
 	printer("m changes mute mode");
 	printer("gm get mute mode");
@@ -2971,6 +2979,9 @@ fm_status fmapp_execute_rx_other_command(char *cmd, int *index, fm_rx_context_s 
 	case 's':
 		ret = fmapp_set_stereo(*fm_context);
 		break;
+	case 't':
+		ret = fmapp_enable_rx_audio_routing(*fm_context);
+		break;
 	case 'm':
 		ret = fmapp_set_mute(*fm_context);
 		break;
@@ -2993,7 +3004,7 @@ fm_status fmapp_execute_rx_other_command(char *cmd, int *index, fm_rx_context_s 
 		ret = fmapp_set_emphasis_filter(*fm_context);
 		break;
 //	case 'o':
-//		ret = fmapp_set_audio_routing(*fm_context, interactive,cmd+1,index);
+//		ret = fmapp_set_audio_routing(*fm_context);
 //		break;
 	case 'z':
 		ret = fmapp_set_rds_system(*fm_context);
@@ -3256,7 +3267,7 @@ fm_status fmapp_execute_command(char *cmd, int *index, void **fm_context,
 	fm_status ret = FMC_STATUS_SUCCESS;
 	FMAPP_BEGIN();
 
-	FMAPP_TRACE("received command %d", *cmd);
+	FMAPP_TRACE("executing command %c (%d)", *cmd, (int)*cmd);
 
 	/* ignore non characters */
 	if (*cmd < '!' || *cmd > '~')
@@ -3370,7 +3381,7 @@ static void fmapp_usage(char *app_name)
 	printf(FMAPP_WELCOME_STR"\n");
 	printf("Usage: %s [ OPTIONS ]\n", app_name);
 	printf("  -i, --device=hci_dev          HCI device\n");
-	printf("  -f, --frequency=freq          Initial frequency (in KHz)\n");
+	printf("  -f, --frequency=freq          Initial frequency (e.g. 99000)\n");
 	printf("  -r, --rds                     Turn on RDS parsing\n");
 	printf("  -v, --volume=level            Volume level (0-%d, default"
 								" is %d)\n",
@@ -3379,9 +3390,6 @@ static void fmapp_usage(char *app_name)
 	printf("  -t, --trace=level             Trace level (1-8, default is"
 								" %d)\n",
 						FM_APP_TRACE_THRESHOLD);
-	printf("  -y, --stack-trace=level       Stack Trace lvl  (1-8, deault"
-								" is %d)\n",
-						FM_STACK_TRACE_THRESHOLD);
 	printf("  -s, --sript=file              Script file for automatic"
 							" tests, see below\n");
 	printf("  -1, --rx			Display RX command list\n");
@@ -3392,7 +3400,6 @@ static void fmapp_usage(char *app_name)
 static struct option fmapp_main_options[] = {
 	{ "device", 1, 0, 'i' },
 	{ "trace", 1, 0, 't' },
-	{ "stack-trace", 1, 0, 'y' },
 	{ "frequency", 1, 0, 'f' },
 	{ "volume", 1, 0, 'v' },
 	{ "rds", 0, 0, 'r' },
@@ -3425,14 +3432,14 @@ fm_status parse_options(int argc, char **argv, char **script, int *startup_len)
 			g_fmapp_hci_dev = atoi(optarg);
 			break;
 		case 'f':
-			fvar = atof(optarg);
+			ivar = atoi(optarg);
 			/* store command in startup string */
 			/*
 			 * futile if user also gives a sequence script, but
 			 * not harmful
 			 */
 			ADD_CMD_TO_STARTUP(opt);
-			ADD_VAR_TO_STARTUP("%2.1f", fvar);
+			ADD_VAR_TO_STARTUP("%d", ivar);
 			break;
 		case 'v':
 			ivar = atoi(optarg);
@@ -3446,11 +3453,6 @@ fm_status parse_options(int argc, char **argv, char **script, int *startup_len)
 		case 't':
 			g_app_trace_threshold = atoi(optarg);
 			validate_uint_boundaries(&g_app_trace_threshold,
-					MIN_THRESHOLD_LVL, MAX_THRESHOLD_LVL);
-			break;
-		case 'y':
-			g_stack_trace_threshold = atoi(optarg);
-			validate_uint_boundaries(&g_stack_trace_threshold,
 					MIN_THRESHOLD_LVL, MAX_THRESHOLD_LVL);
 			break;
 		case '1':
@@ -3497,76 +3499,21 @@ fm_status parse_options(int argc, char **argv, char **script, int *startup_len)
 	return ret;
 }
 
-static int get_rfkill_path(char **rfkill_state_path)
-{
-	char path[64];
-	char buf[16];
-	int fd;
-	int sz;
-	int id;
-	for (id = 0;; id++) {
-		snprintf(path, sizeof(path), "/sys/class/rfkill/rfkill%d/type",
-			  id);
-		fd = open(path, O_RDONLY);
-		if (fd < 0) {
-			fprintf(stderr, "open(%s) failed: %s (%d)\n", path,
-				 strerror(errno), errno);
-			return -1;
-		}
-		sz = read(fd, &buf, sizeof(buf));
-		close(fd);
-		if (sz >= 2 && memcmp(buf, "fm", 2) == 0) {
-			break;
-		}
-	}
-	asprintf(rfkill_state_path, "/sys/class/rfkill/rfkill%d/state", id);
-	return 0;
-}
-
-int set_fm_chip_enable(int enable)
-{
-	/*
-	 * const char enable_path[]="/sys/wl127x/fm_enable";
-	 * change for donut branch [2.6.29 kernel only
-	 */
-	char *enable_path = NULL;
-	/* set /sys/class/rfkill/rfkill1/state to enable FM chip */
-	get_rfkill_path(&enable_path);
-
-	char buffer='0';
-	int ret;
-	/* set /sys/wl127x/fm_enable=0 to enable FM chip */
-	ret = open(enable_path, O_RDWR);
-	if (ret < 0)
-	{
-		FMAPP_ERROR("Unable to open %s\n", enable_path);
-		return -1;
-	}
-	/* FIXME: why does this require a pulse, and
-	 * not just a transition from high to low
-	 */
-	buffer='0';
-	write(ret,&buffer,1);
-	buffer='1';
-	write(ret,&buffer,1);
-	buffer='0';
-	write(ret,&buffer,1);
-
-	if (!enable)
-	{
-		buffer='1';
-		write(ret,&buffer,1);
-	}
-	close(ret);
-	/* end of change for Zoom2+pg-2.0 */
-}
-
 int main(int argc, char **argv)
 {
 	char buffer[1024];
 	int ret = 0, sequence_len = sizeof(buffer);
 	void *fm_context = NULL;
 	char *commands = buffer;
+
+    gMcpLogEnabled = 1;
+    gMcpLogToStdout = 0;
+    gMcpLogToUdpSocket = 0;
+    gMcpLogToFile = 1;
+    strcpy(gMcpLogFileName, LOG_FILE);
+
+	MCP_HAL_LOG_Init();
+	//FMC_LOG_INFO(("FMAPP"));
 
 	ret = fm_trace_init();
 	if (ret)
@@ -3626,6 +3573,7 @@ disable:
 out:
 	FMAPP_END();
 	fm_trace_deinit();
+	MCP_HAL_LOG_Deinit();
 fastout:
 	exit(ret);
 }
@@ -3650,10 +3598,6 @@ const char *control_elements_of_interest[] = {
                  snd_ctl_close(ctl); \
                  return FMC_STATUS_FAILED; \
              }
-/* TODO:
- * replace the hard-coded _enumerated/_boolean/_integer by
- * something better, also remove the hard-coded values_of_control
- */
 #define AUX_CAPTURE_ROUTE_ON 1
 #define AUX_CAPTURE_ROUTE_OFF 0
 
@@ -3819,5 +3763,6 @@ fm_status unset_fmapp_audio_routing(fm_rx_context_s *fm_context)
      return FMC_STATUS_SUCCESS;
 }
 
-
 #endif
+
+
