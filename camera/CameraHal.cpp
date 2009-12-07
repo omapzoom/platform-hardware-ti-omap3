@@ -142,6 +142,14 @@ CameraHal::CameraHal()
 		LOGE("Failed creating pipe");
 	}
 	
+	if( pipe(snapshotPipe) != 0 ){
+		LOGE("Failed creating pipe");
+	}
+
+	if( pipe(snapshotReadyPipe) != 0 ){
+		LOGE("Failed creating pipe");
+	}
+
 	mPROCThread = new PROCThread(this);
     mPROCThread->run("CameraPROCThread", PRIORITY_URGENT_DISPLAY);
 	LOGD("STARTING PROC THREAD \n");
@@ -153,6 +161,10 @@ CameraHal::CameraHal()
 	mRawThread = new RawThread(this);
     mRawThread->run("CameraRawThread", PRIORITY_URGENT_DISPLAY);
 	LOGD("STARTING Raw THREAD \n");
+
+	mSnapshotThread = new SnapshotThread(this);
+    mSnapshotThread->run("CameraSnapshotThread", PRIORITY_URGENT_DISPLAY);
+	LOGD("STARTING Snapshot THREAD \n");
 
 #ifdef FW3A
     if (fobj!=NULL)
@@ -192,6 +204,7 @@ CameraHal::~CameraHal()
 	sp<PROCThread> procThread;
 	sp<RawThread> rawThread;
 	sp<ShutterThread> shutterThread;
+	sp<SnapshotThread> snapshotThread;
 	  
     LOG_FUNCTION_NAME
 	
@@ -272,6 +285,23 @@ CameraHal::~CameraHal()
     { // scope for the lock
         Mutex::Autolock lock(mLock);
         mRawThread.clear();
+    }
+
+    procMessage[0] = SNAPSHOT_THREAD_EXIT;
+    write(snapshotPipe[1], procMessage, sizeof(unsigned int));
+
+    {
+        Mutex::Autolock lock(mLock);
+        snapshotThread = mSnapshotThread;
+    }
+
+    if (snapshotThread != 0 ) {
+        snapshotThread->requestExitAndWait();
+    }
+
+    {
+        Mutex::Autolock lock(mLock);
+        mSnapshotThread.clear();
     }
 
     ICaptureDestroy();
@@ -934,22 +964,9 @@ int CameraHal::CameraStop()
     cfilledbuffer.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     cfilledbuffer.memory = V4L2_MEMORY_USERPTR;
 
-#if !OPEN_CLOSE_WORKAROUND
     while(nCameraBuffersQueued){
         nCameraBuffersQueued--;
-        
-#if 0
-        if (ioctl(camera_device, VIDIOC_DQBUF, &cfilledbuffer) < 0) {
-	        LOGE("VIDIOC_DQBUF Failed!!!");
-			return -1;
-        }
-		LOGD("After Cam DQBUF. Buffers Queued=%d Buffer Dequeued=%d",nCameraBuffersQueued, cfilledbuffer.index);
-
-#endif
-
     }
-
-#endif
 
 #ifdef DEBUG_LOG
 
@@ -1106,15 +1123,10 @@ int  CameraHal::ICapturePerform()
     int status = 0;
     int jpegSize;
     void *outBuffer;  
-    void* snapshot_buffer;
     unsigned long base, offset, jpeg_offset;
-    int snapshot_buffer_index;
     int image_width, image_height;
-    int preview_width, preview_height;
     struct manual_parameters  manual_config;
 	unsigned int procMessage[22], shutterMessage[3], rawMessage[4];
-    mapping_data_t* data;
-	overlay_buffer_t overlaybuffer;
 	int pixelFormat;
 
 #ifdef DEBUG_LOG
@@ -1126,7 +1138,6 @@ int  CameraHal::ICapturePerform()
 #endif
 
     mParameters.getPictureSize(&image_width, &image_height);
-    mParameters.getPreviewSize(&preview_width, &preview_height);
 
 #ifdef DEBUG_LOG
 
@@ -1177,25 +1188,17 @@ int  CameraHal::ICapturePerform()
 
 #endif
 
-#if OPEN_CLOSE_WORKAROUND
-    close(camera_device);
-    camera_device = open(VIDEO_DEVICE, O_RDWR);
-    if (camera_device < 0) {
-        LOGE ("!!!!!!!!!FATAL Error: Could not open the camera device: %s!!!!!!!!!",  strerror(errno) );
-    }   
-    PPM("CLOSED AND REOPENED CAMERA");
-#endif
-
     iobj->cfg.image_width   = image_width;
     iobj->cfg.image_height  = image_height;
     iobj->cfg.lsc_type      = LSC_UPSAMPLED_BY_SOFTWARE;
     iobj->cfg.cam_dev       = camera_device;
     iobj->cfg.mknote        = ancillary_buffer;
     iobj->cfg.manual        = &manual_config;
-    iobj->cfg.priv          = NULL;//this;
+    iobj->cfg.priv          = this;
     iobj->cfg.cb_write_h3a  = NULL;//onSaveH3A;
     iobj->cfg.cb_write_lsc  = NULL;//onSaveLSC;
     iobj->cfg.cb_write_raw  = NULL;//onSaveRAW;
+    iobj->cfg.cb_picture_done = onSnapshot;
     manual_config.pre_flash = 0;
 
     if(mcapture_mode == 1)
@@ -1255,78 +1258,34 @@ int  CameraHal::ICapturePerform()
     
 #endif
 
-	//SaveFile(NULL, (char*)"yuv", yuv_buffer, yuv_len);
+    pixelFormat = PIX_YUV422I;
 
-    pixelFormat = PIX_YUV422I;   
+//block until snapshot is ready
+    fd_set descriptorSet;
+    int max_fd;
+    unsigned int snapshotReadyMessage;
 
-#ifdef HARDWARE_OMX
-#if OPEN_CLOSE_WORKAROUND
-    close(camera_device);
-    camera_device = open(VIDEO_DEVICE, O_RDWR);
-    if (camera_device < 0) {
-        LOGE ("!!!!!!!!!FATAL Error: Could not open the camera device: %s!!!!!!!!!", strerror(errno) );
-    }
-    PPM("CLOSED AND REOPENED CAMERA");
-#endif	
+	max_fd = snapshotReadyPipe[0] + 1;
 
-#if VPP
-
-	mParameters.getPreviewSize(&preview_width, &preview_height);
-
-	data = (mapping_data_t*)mOverlay->getBufferAddress( (void*)(lastOverlayBufferDQ) );
-
-    if ( data == NULL ) {
-        LOGE(" getBufferAddress returned NULL");
-    }
-
-	snapshot_buffer = (void*)data->ptr;
-
-#ifdef PPM_INSTRUMENTATION
-
-	PPM("Before vpp downscales:"); 
-    
-#endif
-
-    status = scale_process(yuv_buffer, iobj->proc.out_img_w, iobj->proc.out_img_h,
-             snapshot_buffer, preview_width, preview_height, 0, PIX_YUV422I, mZoomTarget);
+	FD_ZERO(&descriptorSet);
+	FD_SET(snapshotReadyPipe[0], &descriptorSet);
 
 #ifdef DEBUG_LOG
 
-	PPM("After vpp downscales:");
+		LOGD("Waiting on SnapshotThread ready message");
 
 #endif
 
-	if( status ) 
-	    LOGE("scale_process() failed");
-	else 
-	    LOGD("scale_process() OK");
+    err = select(max_fd,  &descriptorSet, NULL, NULL, NULL);
+	if (err < 1) {
+		LOGE("Error in select");
+	}
+
+	if(FD_ISSET(snapshotReadyPipe[0], &descriptorSet))
+		read(snapshotReadyPipe[0], &snapshotReadyMessage, sizeof(snapshotReadyMessage));
+//
 
 #if PPM_INSTRUMENTATION
-
-	PPM("Shot to Snapshot", &ppm_receiveCmdToTakePicture);
-
-#endif
-
-	status = mOverlay->queueBuffer((void*)(lastOverlayBufferDQ));
-    if (status) {
-		LOGE("mOverlay->queueBuffer() failed!!!!");
-    } else {
-        buffers_queued_to_dss[lastOverlayBufferDQ]=1;
-        nOverlayBuffersQueued++;
-    }
-
-    status = mOverlay->dequeueBuffer(&overlaybuffer);
-    if (status) {
-        LOGE("mOverlay->dequeueBuffer() failed!!!!");
-    } else {
-        nOverlayBuffersQueued--;
-        buffers_queued_to_dss[(int)overlaybuffer] = 0;
-        lastOverlayBufferDQ = (int)overlaybuffer;	
-    }
-
-#endif //VPP
-
-#ifdef PPM_INSTRUMENTATION
 
 	PPM("SENDING MESSAGE TO PROCESSING THREAD");
 
@@ -1356,8 +1315,6 @@ int  CameraHal::ICapturePerform()
     procMessage[21] = (unsigned int) mPictureCallbackCookie;
 
 	write(procPipe[1], &procMessage, sizeof(procMessage));
-
-#endif //HARDWARE_OMX
 
 #ifdef DEBUG_LOG
 
@@ -1416,6 +1373,122 @@ fail_process:
 
 #endif
 
+void CameraHal::snapshotThread()
+{
+    fd_set descriptorSet;
+    int max_fd;
+    int err, status;
+    unsigned int snapshotMessage[5], snapshotReadyMessage;
+    int image_width, image_height, pixelFormat, preview_width, preview_height;
+    mapping_data_t* data;
+	overlay_buffer_t overlaybuffer;
+    void *yuv_buffer, *snapshot_buffer;
+    int ZoomTarget;
+
+    LOG_FUNCTION_NAME
+
+    pixelFormat = PIX_YUV422I;
+	max_fd = snapshotPipe[0] + 1;
+
+	FD_ZERO(&descriptorSet);
+	FD_SET(snapshotPipe[0], &descriptorSet);
+
+    while(1) {
+        err = select(max_fd,  &descriptorSet, NULL, NULL, NULL);
+
+#ifdef DEBUG_LOG
+
+		LOGD("SNAPSHOT THREAD SELECT RECEIVED A MESSAGE\n");
+
+#endif
+
+		if (err < 1) {
+			LOGE("Snapshot: Error in select");
+		}
+
+		if(FD_ISSET(snapshotPipe[0], &descriptorSet)){
+
+			read(snapshotPipe[0], &snapshotMessage, sizeof(snapshotMessage));
+
+			if(snapshotMessage[0] == SNAPSHOT_THREAD_START){
+
+#ifdef DEBUG_LOG
+
+				LOGD("SNAPSHOT_THREAD_START RECEIVED\n");
+
+#endif
+
+                yuv_buffer = (void *) snapshotMessage[1];
+				image_width = snapshotMessage[2];
+				image_height = snapshotMessage[3];
+				ZoomTarget = snapshotMessage[4];
+
+	            mParameters.getPreviewSize(&preview_width, &preview_height);
+
+	            data = (mapping_data_t*)mOverlay->getBufferAddress( (void*)(lastOverlayBufferDQ) );
+
+                if ( data == NULL ) {
+                    LOGE(" getBufferAddress returned NULL");
+                }
+
+	            snapshot_buffer = (void*)data->ptr;
+
+#if PPM_INSTRUMENTATION
+
+	            PPM("Before vpp downscales:");
+
+#endif
+
+                status = scale_process(yuv_buffer, image_width, image_height,
+                         snapshot_buffer, preview_width, preview_height, 0, PIX_YUV422I, ZoomTarget);
+
+#ifdef DEBUG_LOG
+
+	            PPM("After vpp downscales:");
+
+	            if( status )
+	                LOGE("scale_process() failed");
+	            else
+	                LOGD("scale_process() OK");
+
+#endif
+
+#if PPM_INSTRUMENTATION
+
+	            PPM("Shot to Snapshot", &ppm_receiveCmdToTakePicture);
+
+#endif
+
+	            status = mOverlay->queueBuffer((void*)(lastOverlayBufferDQ));
+                if (status) {
+		            LOGE("mOverlay->queueBuffer() failed!!!!");
+                } else {
+                    buffers_queued_to_dss[lastOverlayBufferDQ]=1;
+                    nOverlayBuffersQueued++;
+                }
+
+                status = mOverlay->dequeueBuffer(&overlaybuffer);
+                if (status) {
+                    LOGE("mOverlay->dequeueBuffer() failed!!!!");
+                } else {
+                    nOverlayBuffersQueued--;
+                    buffers_queued_to_dss[(int)overlaybuffer] = 0;
+                    lastOverlayBufferDQ = (int)overlaybuffer;
+                }
+
+                write(snapshotReadyPipe[1], &snapshotReadyMessage, sizeof(snapshotReadyMessage));
+
+		    } else if (snapshotMessage[0] == SNAPSHOT_THREAD_EXIT) {
+				LOGD("SNAPSHOT_THREAD_EXIT RECEIVED");
+
+				break;
+		    }
+        }
+    }
+
+    LOG_FUNCTION_NAME_EXIT
+}
+
 void CameraHal::rawThread()
 {
     LOG_FUNCTION_NAME
@@ -1443,7 +1516,7 @@ void CameraHal::rawThread()
 #endif
 
 		if (err < 1) {
-			LOGE("Error in select");
+			LOGE("Raw: Error in select");
 		}
 
 		if(FD_ISSET(rawPipe[0], &descriptorSet)){
@@ -1507,7 +1580,7 @@ void CameraHal::shutterThread()
 #endif
 
 		if (err < 1) {
-			LOGE("Error in select");
+			LOGE("Shutter: Error in select");
 		}
 
 		if(FD_ISSET(shutterPipe[0], &descriptorSet)){
@@ -1558,7 +1631,7 @@ void CameraHal::procThread()
 	unsigned int procMessage [22];
 	int jpegQuality, jpegSize, size, base, offset, yuv_offset, yuv_len, image_rotation, image_zoom, ippMode;
 	sp<MemoryHeapBase> JPEGPictureHeap, PictureHeap;
-    sp<MemoryBase> JPEGPictureMemBase, PictureBuffer;
+    sp<MemoryBase> JPEGPictureMemBase;
     raw_callback RawPictureCallback;
     jpeg_callback JpegPictureCallback;
     void *yuv_buffer, *outBuffer, *PictureCallbackCookie;
@@ -1605,7 +1678,7 @@ void CameraHal::procThread()
 #endif
 
 		if (err < 1) {
-			LOGE("Error in select");
+			LOGE("Proc: Error in select");
 		}
 
 		if(FD_ISSET(procPipe[0], &descriptorSet)){
@@ -1646,8 +1719,7 @@ void CameraHal::procThread()
                 JPEGPictureHeap = mJPEGPictureHeap;
                 outBuffer = mJPEGBuffer;
                 offset = mJPEGOffset;
-                
-				PictureBuffer = new MemoryBase(PictureHeap, yuv_offset, yuv_len);
+
 #if RESIZER
 
                 if( (image_width != capture_width) || (image_height != capture_height) || (image_rotation != 0) || (image_zoom != 1) ) {
@@ -1672,32 +1744,12 @@ void CameraHal::procThread()
 
                     switchBuffer = true;
 
-#if 0
-                    void *tmpBuffer = outBuffer;
-                    outBuffer = yuv_buffer;
-                    yuv_buffer = (unsigned char *)tmpBuffer;
-                    
-                    sp<MemoryHeapBase> tmpHeap = JPEGPictureHeap;
-                    JPEGPictureHeap = mPictureHeap;
-                    PictureHeap = tmpHeap;
-                    
-                    int tmpSize = jpegSize;
-                    jpegSize = yuv_len;
-                    yuv_len = tmpSize;
-                    
-                    int tmpOffset = offset;
-                    offset = yuv_offset;
-                    yuv_offset = tmpOffset;
-                    
                     if( (rotation == 90) || (rotation == 270) ) {
                         int tmp = image_width;
                         image_width = image_height;
                         image_height = tmp;
                     }
-                    
-                    PictureBuffer.clear();
-                    PictureBuffer = new MemoryBase(PictureHeap, yuv_offset, yuv_len);
-#endif
+
                 }
 #else
                 image_width = capture_width;
@@ -1881,7 +1933,6 @@ void CameraHal::procThread()
    
 #endif
 
-                PictureBuffer.clear();
                 JPEGPictureMemBase.clear();
                 
                 PictureHeap->dispose();
@@ -2106,8 +2157,6 @@ int CameraHal::ICaptureDestroy(void)
 
 status_t CameraHal::setOverlay(const sp<Overlay> &overlay)
 {
-    int w,h;
-
     Mutex::Autolock lock(mLock);
 
     LOGD("CameraHal setOverlay/1/%08lx/%08lx", (long unsigned int)overlay.get(), (long unsigned int)mOverlay.get());
@@ -2132,15 +2181,6 @@ status_t CameraHal::setOverlay(const sp<Overlay> &overlay)
         return NO_ERROR;
     }
 
-    mParameters.getPreviewSize(&w, &h);
-
-    if ((w == RES_720P) || (h == RES_720P))
-    {
-        mOverlay->setAttributes(CACHEABLE_BUFFERS, 1);
-        mOverlay->setAttributes(MAINTAIN_COHERENCY, 0);    
-        mOverlay->resizeInput(w, h);
-    }
-    
     // Restart the preview (Only for Overlay Case)
     LOGD("Restart the preview ");
     startPreview(NULL,NULL);
@@ -2615,6 +2655,27 @@ void CameraHal::dumpFrame(void *buffer, int size, char *path)
 
 void CameraHal::release()
 {
+}
+
+int CameraHal::onSnapshot(void *priv, void *buf, int width, int height)
+{
+    unsigned int snapshotMessage[5];
+
+    CameraHal* camHal = reinterpret_cast<CameraHal*>(priv);
+
+    LOG_FUNCTION_NAME
+
+    snapshotMessage[0] = SNAPSHOT_THREAD_START;
+    snapshotMessage[1] = (unsigned int) buf;
+    snapshotMessage[2] = width;
+    snapshotMessage[3] = height;
+    snapshotMessage[4] = camHal->mZoomTarget;
+
+    write(camHal->snapshotPipe[1], &snapshotMessage, sizeof(snapshotMessage));
+
+    LOG_FUNCTION_NAME_EXIT
+
+    return 0;
 }
 
 int CameraHal::onSaveH3A(void *priv, void *buf, int size)

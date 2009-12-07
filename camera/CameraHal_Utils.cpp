@@ -850,15 +850,6 @@ int CameraHal::CapturePicture(){
 
     LOGD("Picture Size: Width = %d \tHeight = %d", image_width, image_height);
 
-#if OPEN_CLOSE_WORKAROUND
-    close(camera_device);
-    camera_device = open(VIDEO_DEVICE, O_RDWR);
-    if (camera_device < 0) {
-          LOGE ("!!!!!!!!!FATAL Error: Could not open the camera device: %s!!!!!!!!!",
-         		  strerror(errno) );
-  	}
-#endif
-
     format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     format.fmt.pix.width = image_width;
     format.fmt.pix.height = image_height;
@@ -962,20 +953,9 @@ int CameraHal::CapturePicture(){
     if (mRawPictureCallback) {
         mRawPictureCallback(mPictureBuffer, mPictureCallbackCookie);
     }
-
-#if OPEN_CLOSE_WORKAROUND
-    close(camera_device);
-    camera_device = open(VIDEO_DEVICE, O_RDWR);
-    if (camera_device < 0) {
-          LOGE ("!!!!!!!!!FATAL Error: Could not open the camera device: %s!!!!!!!!!",
-         		  strerror(errno) );
-  	}
-#endif
   
     yuv_buffer = (uint8_t*)buffer.m.userptr;	
     LOGD("PictureThread: generated a picture, yuv_buffer=%p yuv_len=%d",yuv_buffer,yuv_len);
-
-    //image_height &= 0xFFFFFFF8;
 
 #ifdef HARDWARE_OMX
 #if VPP
