@@ -88,7 +88,7 @@ extern "C" {
 #define VIDEO_DEVICE        "/dev/video5"
 #define MIN_WIDTH           128
 #define MIN_HEIGHT          96
-#define PICTURE_WIDTH   3280 /* 5mp - 2560. 8mp - 3280 */ /* Make sure it is a multiple of 16. */
+#define PICTURE_WIDTH   3296 /* 5mp - 2560. 8mp - 3280 */ /* Make sure it is a multiple of 16. */
 #define PICTURE_HEIGHT  2464 /* 5mp - 2048. 8mp - 2464 */ /* Make sure it is a multiple of 16. */
 #define PREVIEW_WIDTH 176
 #define PREVIEW_HEIGHT 144
