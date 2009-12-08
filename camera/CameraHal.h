@@ -88,8 +88,8 @@ extern "C" {
 #define VIDEO_DEVICE        "/dev/video5"
 #define MIN_WIDTH           128
 #define MIN_HEIGHT          96
-#define PICTURE_WIDTH   /*3280*/ 4000/* 5mp - 2560. 8mp - 3280 */ /* Make sure it is a multiple of 16. */
-#define PICTURE_HEIGHT  /*2464*/ 3000 /* 5mp - 2048. 8mp - 2464 */ /* Make sure it is a multiple of 16. */
+#define PICTURE_WIDTH   3280 /* 5mp - 2560. 8mp - 3280 */ /* Make sure it is a multiple of 16. */
+#define PICTURE_HEIGHT  2464 /* 5mp - 2048. 8mp - 2464 */ /* Make sure it is a multiple of 16. */
 #define PREVIEW_WIDTH 176
 #define PREVIEW_HEIGHT 144
 #define PIXEL_FORMAT           V4L2_PIX_FMT_UYVY
@@ -98,7 +98,6 @@ extern "C" {
 #define VIDEO_FRAME_COUNT_MAX    NUM_OVERLAY_BUFFERS_REQUESTED
 #define MAX_CAMERA_BUFFERS    NUM_OVERLAY_BUFFERS_REQUESTED
 
-#define OPEN_CLOSE_WORKAROUND	 0
 
 #define PIX_YUV422I 0
 #define PIX_YUV420P 1
@@ -160,6 +159,8 @@ typedef struct OMX_IPP
 #define SHUTTER_THREAD_EXIT     0x2
 #define RAW_THREAD_CALL         0x1
 #define RAW_THREAD_EXIT         0x2
+#define SNAPSHOT_THREAD_START   0x1
+#define SNAPSHOT_THREAD_EXIT    0x2
 
 #define PAGE                    0x1000
 
@@ -246,7 +247,7 @@ public:
     void initDefaultParameters();
     static sp<CameraHardwareInterface> createInstance();
 
-private:
+//private:
 
     class PreviewThread : public Thread {
         CameraHal* mHardware;
@@ -257,6 +258,18 @@ private:
         virtual bool threadLoop() {
             mHardware->previewThread();
 
+            return false;
+        }
+    };
+
+    class SnapshotThread : public Thread {
+        CameraHal* mHardware;
+    public:
+        SnapshotThread(CameraHal* hw)
+            : Thread(false), mHardware(hw) { }
+
+        virtual bool threadLoop() {
+            mHardware->snapshotThread();
             return false;
         }
     };
@@ -300,6 +313,7 @@ private:
     static int onSaveH3A(void *priv, void *buf, int size);
     static int onSaveLSC(void *priv, void *buf, int size);
     static int onSaveRAW(void *priv, void *buf, int size);
+    static int onSnapshot(void *priv, void *buf, int width, int height);
 
     CameraHal();
     virtual ~CameraHal();
@@ -308,6 +322,7 @@ private:
     void procThread();
     void shutterThread();
     void rawThread();
+    void snapshotThread();
     
 #ifdef FW3A
     int FW3A_Create();
@@ -389,6 +404,7 @@ private:
 	sp<PROCThread>  mPROCThread;
 	sp<ShutterThread> mShutterThread;
 	sp<RawThread> mRawThread;
+	sp<SnapshotThread> mSnapshotThread;
     bool mPreviewRunning;
     Mutex mRecordingLock;
     int mRecordingFrameSize;
@@ -415,7 +431,7 @@ private:
     int mfirstTime;
     static wp<CameraHardwareInterface> singleton;
     static int camera_device;
-	int procPipe[2], shutterPipe[2], rawPipe[2];
+	int procPipe[2], shutterPipe[2], rawPipe[2], snapshotPipe[2], snapshotReadyPipe[2];
 	int mippMode;
 	int pictureNumber;
 	int rotation;
