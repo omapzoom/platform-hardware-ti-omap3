@@ -1942,10 +1942,10 @@ void CameraHal::procThread()
 
 #ifdef OPP_OPTIMIZATION
 
-                    if ( RMProxy_RequestBoost(NOMINAL_BOOST) != OMX_ErrorNone ) {
-                        LOGE("OPP Boost failed");
+                    if ( RMProxy_ReleaseBoost() != OMX_ErrorNone ) {
+                        LOGE("OPP Release Boost failed");
                     } else {
-                        LOGE("OPP Boost success");
+                        LOGE("OPP Release Boost success");
                     }
 
 #endif

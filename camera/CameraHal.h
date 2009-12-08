@@ -69,7 +69,7 @@
 #include "ipp_algotypes.h"
 #include "capdefs.h"
 
-#undef OPP_OPTIMIZATION
+#define OPP_OPTIMIZATION 1
 
 #ifdef OPP_OPTIMIZATION
 
