@@ -2158,6 +2158,7 @@ int CameraHal::ICaptureDestroy(void)
 status_t CameraHal::setOverlay(const sp<Overlay> &overlay)
 {
     Mutex::Autolock lock(mLock);
+    int w,h;
 
     LOGD("CameraHal setOverlay/1/%08lx/%08lx", (long unsigned int)overlay.get(), (long unsigned int)mOverlay.get());
     // De-alloc any stale data
@@ -2179,6 +2180,15 @@ status_t CameraHal::setOverlay(const sp<Overlay> &overlay)
     {
         LOGE("Trying to set overlay, but overlay is null!, line:%d",__LINE__);
         return NO_ERROR;
+    }
+
+    mParameters.getPreviewSize(&w, &h);
+
+    if ((w == RES_720P) || (h == RES_720P))
+    {
+        mOverlay->setAttributes(CACHEABLE_BUFFERS, 1);
+        mOverlay->setAttributes(MAINTAIN_COHERENCY, 0);
+        mOverlay->resizeInput(w, h);
     }
 
     // Restart the preview (Only for Overlay Case)
@@ -2365,7 +2375,7 @@ static void debugShowFPS()
         mFps =  ((mFrameCount - mLastFrameCount) * float(s2ns(1))) / diff;
         mLastFpsTime = now;
         mLastFrameCount = mFrameCount;
-	LOGD("####### [%d] Frames, %f FPS", mFrameCount, mFps);
+        LOGD("####### [%d] Frames, %f FPS", mFrameCount, mFps);
     }
  }
 
