@@ -2093,9 +2093,11 @@ int CameraHal::ICaptureCreate(void)
         isStart_VPP = true;
     }
 #endif
+#ifdef IMAGE_PROCESSING_PIPELINE
 
 	mippMode=0;
 
+#endif
 #if JPEG
     jpegEncoder = new JpegEncoder;
     
