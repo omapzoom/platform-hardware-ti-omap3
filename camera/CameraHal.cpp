@@ -249,6 +249,8 @@ CameraHal::~CameraHal()
     { // scope for the lock
         Mutex::Autolock lock(mLock);
         mPROCThread.clear();
+        close(procPipe[0]);
+        close(procPipe[1]);
     }
 
 	procMessage[0] = SHUTTER_THREAD_EXIT;
@@ -267,6 +269,8 @@ CameraHal::~CameraHal()
     { // scope for the lock
         Mutex::Autolock lock(mLock);
         mShutterThread.clear();
+        close(shutterPipe[0]);
+        close(shutterPipe[1]);
     }
     
 	procMessage[0] = RAW_THREAD_EXIT;
@@ -285,6 +289,8 @@ CameraHal::~CameraHal()
     { // scope for the lock
         Mutex::Autolock lock(mLock);
         mRawThread.clear();
+        close(rawPipe[0]);
+        close(rawPipe[1]);
     }
 
     procMessage[0] = SNAPSHOT_THREAD_EXIT;
@@ -302,6 +308,10 @@ CameraHal::~CameraHal()
     {
         Mutex::Autolock lock(mLock);
         mSnapshotThread.clear();
+        close(snapshotPipe[0]);
+        close(snapshotPipe[1]);
+        close(snapshotReadyPipe[0]);
+        close(snapshotReadyPipe[1]);
     }
 
     ICaptureDestroy();
