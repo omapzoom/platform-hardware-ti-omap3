@@ -52,6 +52,7 @@ extern "C" {
 #define LCD_HEIGHT 480
 
 
+#define IsArgOdd( w ) ((w)%2)
 typedef struct
 {
   uint32_t posX;
@@ -506,7 +507,12 @@ static overlay_t* overlay_createOverlay
 
     LOGI("Create overlay, w=%d h=%d format=%d\n", w, h, format);
 
-    if ( ctx->overlay_video1 ) 
+    if(IsArgOdd(w) || IsArgOdd(h))
+    {
+       LOGE("%d: Error: For YUV 422, the resolution must be a multiple of 2.\n", __LINE__);
+       /*Should return null pointer*/
+    }
+    else if ( ctx->overlay_video1 )
     {
         LOGE("Overlays already in use\n");
         // Return an error
@@ -1046,11 +1052,16 @@ static int overlay_resizeInput(struct overlay_data_device_t *dev, uint32_t w, ui
         LOGE("Same as current width and height. Attributes did not change either. So do nothing.");
         return 0;
     }
-
     if ( ctx->shared == NULL )
     {
         LOGI("Shared Data Not Init'd!\n");
         return -1;
+    }
+
+    if (IsArgOdd(w) || IsArgOdd(h)) {
+       LOGE("%d: Error: For YUV 422, the resolution must be a multiple of 2.\n", __LINE__);
+       /*Returning resize error*/
+       return -1;
     }
 
     if ( ctx->shared->dataReady )
