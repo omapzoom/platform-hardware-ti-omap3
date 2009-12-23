@@ -1869,6 +1869,10 @@ void CameraHal::procThread()
 		                yuv_buffer = pIPP.pIppOutputBuffer;
 	                }
 	                pixelFormat = PIX_YUV420P;
+			if(switchBuffer)
+				tmpLength = image_width * image_height * 1.5;
+			else
+				yuv_len = image_width * image_height * 1.5;
 	            }
     
 #endif
