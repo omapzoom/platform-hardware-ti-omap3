@@ -155,13 +155,10 @@ typedef struct OMX_IPP
 
 #define PROC_THREAD_PROCESS     0x5
 #define PROC_THREAD_EXIT        0x6
-#define PROC_THREAD_NUM_ARGS    23
 #define SHUTTER_THREAD_CALL     0x1
 #define SHUTTER_THREAD_EXIT     0x2
-#define SHUTTER_THREAD_NUM_ARGS 3
 #define RAW_THREAD_CALL         0x1
 #define RAW_THREAD_EXIT         0x2
-#define RAW_THREAD_NUM_ARGS     4
 #define SNAPSHOT_THREAD_START   0x1
 #define SNAPSHOT_THREAD_EXIT    0x2
 
@@ -409,8 +406,6 @@ public:
 	sp<RawThread> mRawThread;
 	sp<SnapshotThread> mSnapshotThread;
     bool mPreviewRunning;
-    bool mIPPInitAlgoState;
-    bool mIPPToEnable;
     Mutex mRecordingLock;
     int mRecordingFrameSize;
     recording_callback mRecordingCallback;
