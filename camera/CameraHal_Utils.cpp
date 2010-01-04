@@ -470,13 +470,10 @@ int CameraHal::InitIPP(int w, int h, int fmt)
 	if(eError != 0){
 		LOGE("ERROR IPP_SetAlgoConfig");
 	}	
-    
-    LOGD("IPP_StartProcessing");
-    eError = IPP_StartProcessing(pIPP.hIPP);
-	if(eError != 0){
-		LOGE("ERROR IPP_SetAlgoConfig");
-	}	
-    
+    else {
+        mIPPInitAlgoState = true;
+    }
+     
     pIPP.iStarInArgs = (IPP_StarAlgoInArgs*)((char*)malloc(sizeof(IPP_StarAlgoInArgs) + BUFF_MAP_PADDING_TEST) + PADDING_OFFSET_TEST);
     pIPP.iStarOutArgs = (IPP_StarAlgoOutArgs*)((char*)(malloc(sizeof(IPP_StarAlgoOutArgs) + BUFF_MAP_PADDING_TEST)) + PADDING_OFFSET_TEST);
 
@@ -521,18 +518,16 @@ int CameraHal::DeInitIPP()
 {
     int eError = 0;
 
-    LOGD("IPP_StopProcessing");
-	eError = IPP_StopProcessing(pIPP.hIPP);
-    if( eError != 0){
-		LOGE("ERROR IPP_StopProcessing");
-	}
-	
-	LOGD("IPP_DeinitializePipe");
-	eError = IPP_DeinitializePipe(pIPP.hIPP);
-    LOGD("IPP_DeinitializePipe");
-    if( eError != 0){
-		LOGE("ERROR IPP_DeinitializePipe");
-	}
+    if(mIPPInitAlgoState)
+    {
+        LOGD("IPP_DeinitializePipe");
+        eError = IPP_DeinitializePipe(pIPP.hIPP);
+        LOGD("IPP_DeinitializePipe");
+        if( eError != 0){
+            LOGE("ERROR IPP_DeinitializePipe");
+        }
+        mIPPInitAlgoState = false;
+    }
 
     LOGD("IPP_Delete");
     IPP_Delete(&(pIPP.hIPP));
@@ -664,6 +659,12 @@ int CameraHal::ProcessBufferIPP(void *pBuffer, long int nAllocLen, int fmt,
 {
     int eError = 0;
 
+    LOGD("IPP_StartProcessing");
+    eError = IPP_StartProcessing(pIPP.hIPP);
+    if(eError != 0){
+        LOGE("ERROR IPP_SetAlgoConfig");
+    }
+
 	if(mippMode == IPP_EdgeEnhancement_Mode){
 		IPPEENFAlgoDynamicParamsArray[0].inPlace                    = 0;
 		IPPEENFAlgoDynamicParamsArray[0].EdgeEnhancementStrength    = EdgeEnhancementStrength;
@@ -762,8 +763,14 @@ int CameraHal::ProcessBufferIPP(void *pBuffer, long int nAllocLen, int fmt,
 		LOGE("ERROR IPP_ProcessImage");
 	}
 
+    LOGD("IPP_StopProcessing");
+        eError = IPP_StopProcessing(pIPP.hIPP);
+    if( eError != 0){
+                LOGE("ERROR IPP_StopProcessing");
+    }
+
 	LOGD("IPP_ProcessImage Done");
-    
+
     return eError;
 }
 
@@ -1038,12 +1045,16 @@ int CameraHal::CapturePicture(){
             ipp_chroma_nf = 2;
         }
 
-		err = InitIPP(image_width,image_height);
-		if( err ) {
-			LOGE("ERROR InitIPP() failed");	
-			return -1;	   
-		}
-		PPM("After IPP Init");
+        if(mIPPToEnable)
+        {
+    		err = InitIPP(image_width,image_height);
+	    	if( err ) {
+	    		LOGE("ERROR InitIPP() failed");	
+	    		return -1;	   
+	    	}
+	    	PPM("After IPP Init");
+            mIPPToEnable = false;
+        }
 		err = PopulateArgsIPP(image_width,image_height);
 		if( err ) {
 			LOGE("ERROR PopulateArgsIPP() failed");		   
@@ -1062,31 +1073,20 @@ int CameraHal::CapturePicture(){
 			LOGE("ERROR ProcessBufferIPP() failed");		   
 			return -1;
 		}
-		PPM("AFTER IPP Process Buffer");
+		PPM("AFTER IPP Process Buffer");		
 
-		if(pIPP.hIPP != NULL){
-			err = DeInitIPP();
-			if( err ){
-				LOGE("ERROR DeInitIPP() failed");
-				return -1;
-			} 
-			pIPP.hIPP = NULL;
-		}
-
-	PPM("AFTER IPP Deinit");
-   	if(!(pIPP.ippconfig.isINPLACE)){ 
-		yuv_buffer = pIPP.pIppOutputBuffer;
-	}
-	 
-	#if ( IPP_YUV422P || IPP_YUV420P_OUTPUT_YUV422I )
-		jpegFormat = PIX_YUV422I;        
-		LOGD("YUV422 !!!!");
-	#else
-		yuv_len=  ((image_width * image_height *3)/2);
-        jpegFormat = PIX_YUV420P;
-		LOGD("YUV420 !!!!");
-    #endif
-		
+       	if(!(pIPP.ippconfig.isINPLACE)){ 
+		    yuv_buffer = pIPP.pIppOutputBuffer;
+	    }
+	     
+	    #if ( IPP_YUV422P || IPP_YUV420P_OUTPUT_YUV422I )
+		    jpegFormat = PIX_YUV422I;        
+		    LOGD("YUV422 !!!!");
+	    #else
+		    yuv_len=  ((image_width * image_height *3)/2);
+            jpegFormat = PIX_YUV420P;
+		    LOGD("YUV420 !!!!");
+        #endif		
 	}
 	//SaveFile(NULL, (char*)"yuv", yuv_buffer, yuv_len); 
     

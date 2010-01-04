@@ -105,6 +105,16 @@ CameraHal::CameraHal()
     isStart_VPP = false;
     isStart_JPEG = false;
     mPictureHeap = NULL;
+    mIPPInitAlgoState = false;
+    mIPPToEnable = false;
+#ifdef IMAGE_PROCESSING_PIPELINE
+    pIPP.hIPP = NULL;
+#endif
+    mIPPInitAlgoState = false;
+    mIPPToEnable = false;
+    #ifdef IMAGE_PROCESSING_PIPELINE
+    pIPP.hIPP = NULL;
+    #endif
 
     int i = 0;
     for(i = 0; i < VIDEO_FRAME_COUNT_MAX; i++)
@@ -321,6 +331,16 @@ CameraHal::~CameraHal()
 #endif
 
     CameraDestroy();
+
+#ifdef IMAGE_PROCESSING_PIPELINE
+    if(pIPP.hIPP != NULL){
+        err = DeInitIPP();
+        if( err ) {
+            LOGE("ERROR DeInitIPP() failed");
+        }
+        pIPP.hIPP = NULL;
+	}
+#endif
 
     if ( mOverlay.get() != NULL )
     {
@@ -1136,7 +1156,9 @@ int  CameraHal::ICapturePerform()
     unsigned long base, offset, jpeg_offset;
     int image_width, image_height;
     struct manual_parameters  manual_config;
-	unsigned int procMessage[22], shutterMessage[3], rawMessage[4];
+    unsigned int    procMessage[PROC_THREAD_NUM_ARGS],
+                    shutterMessage[SHUTTER_THREAD_NUM_ARGS],
+                    rawMessage[RAW_THREAD_NUM_ARGS];
 	int pixelFormat;
 
 #ifdef DEBUG_LOG
@@ -1319,12 +1341,15 @@ int  CameraHal::ICapturePerform()
     procMessage[15] = rotation;
     procMessage[16] = mZoomTarget;
     procMessage[17] = mippMode;
-    procMessage[18] = quality;
-    procMessage[19] = (unsigned int) mJpegPictureCallback;
-    procMessage[20] = (unsigned int) mRawPictureCallback;
-    procMessage[21] = (unsigned int) mPictureCallbackCookie;
+    procMessage[18] = mIPPToEnable;
+    procMessage[19] = quality;
+    procMessage[20] = (unsigned int) mJpegPictureCallback;
+    procMessage[21] = (unsigned int) mRawPictureCallback;
+    procMessage[22] = (unsigned int) mPictureCallbackCookie;
 
-	write(procPipe[1], &procMessage, sizeof(procMessage));
+    write(procPipe[1], &procMessage, sizeof(procMessage));
+
+    mIPPToEnable = false; // reset ipp enable after sending to proc thread
 
 #ifdef DEBUG_LOG
 
@@ -1506,7 +1531,7 @@ void CameraHal::rawThread()
     fd_set descriptorSet;
     int max_fd;
     int err;
-    unsigned int rawMessage[4];
+    unsigned int rawMessage[RAW_THREAD_NUM_ARGS];
     raw_callback RawCallback;
     void *PictureCallbackCookie;
     sp<MemoryBase> rawData;
@@ -1638,8 +1663,9 @@ void CameraHal::procThread()
 	int max_fd;
 	int err;
 	int pixelFormat;
-	unsigned int procMessage [22];
+	unsigned int procMessage [PROC_THREAD_NUM_ARGS];
 	int jpegQuality, jpegSize, size, base, offset, yuv_offset, yuv_len, image_rotation, image_zoom, ippMode;
+    bool ipp_to_enable;
 	sp<MemoryHeapBase> JPEGPictureHeap, PictureHeap;
     sp<MemoryBase> JPEGPictureMemBase;
     raw_callback RawPictureCallback;
@@ -1720,10 +1746,11 @@ void CameraHal::procThread()
 				image_rotation = procMessage[15];
 				image_zoom = procMessage[16];
 				ippMode = procMessage[17];
-				jpegQuality = procMessage[18];
-				JpegPictureCallback = (jpeg_callback) procMessage[19];
-				RawPictureCallback = (raw_callback) procMessage[20];
-				PictureCallbackCookie = (void *) procMessage[21];
+                ipp_to_enable = procMessage[18];
+				jpegQuality = procMessage[19];
+				JpegPictureCallback = (jpeg_callback) procMessage[20];
+				RawPictureCallback = (raw_callback) procMessage[21];
+				PictureCallbackCookie = (void *) procMessage[22];
 
                 jpegSize = mJPEGLength;
                 JPEGPictureHeap = mJPEGPictureHeap;
@@ -1767,25 +1794,9 @@ void CameraHal::procThread()
 #endif //RESIZER	
 
 #ifdef IMAGE_PROCESSING_PIPELINE  	
-#if 1
-
 	            if(ippMode == -1 ){
 		            ippMode = IPP_EdgeEnhancement_Mode;
 	            }
-
-#else
-
-	            if(ippMode ==-1){
-		            ippMode = IPP_CromaSupression_Mode;
-	            }		
-	            if(ippMode == IPP_CromaSupression_Mode){
-		            ippMode = IPP_EdgeEnhancement_Mode;
-	            }
-	            else if(ippMode == IPP_EdgeEnhancement_Mode){
-		            ippMode = IPP_CromaSupression_Mode;
-	            }	
-
-#endif
 
 #ifdef DEBUG_LOG
 
@@ -1804,28 +1815,29 @@ void CameraHal::procThread()
 
 	            if(ippMode){
 
-		            if(mippMode != IPP_CromaSupression_Mode && ippMode != IPP_EdgeEnhancement_Mode)
-			            LOGE("ERROR ippMode unsupported");
+                    if(ippMode != IPP_CromaSupression_Mode && ippMode != IPP_EdgeEnhancement_Mode)
+		                LOGE("ERROR ippMode unsupported");
 
+                    if(ipp_to_enable)
+                    {
 #ifdef DEBUG_LOG
 
-		            PPM("Before init IPP");
+		                PPM("Before init IPP");
 
 #endif
 
-		            err = InitIPP(image_width, image_height, pixelFormat);
-		            if( err )
-			            LOGE("ERROR InitIPP() failed");	
-
+	    	            if(InitIPP(image_width, image_height, pixelFormat))
+        		            LOGE("ERROR InitIPP() failed");
 #ifdef DEBUG_LOG
 
-		            PPM("After IPP Init");
+		                PPM("After IPP Init");
 
 #endif
+                    }
 
 		            err = PopulateArgsIPP(image_width, image_height, pixelFormat);
 		            if( err )
-			            LOGE("ERROR PopulateArgsIPP() failed");		   
+			            LOGE("ERROR PopulateArgsIPP() failed");	   
 
 #ifdef DEBUG_LOG
 
@@ -1852,32 +1864,11 @@ void CameraHal::procThread()
 				                    ipp_chroma_nf);
 				    }
 		            if( err )
-			            LOGE("ERROR ProcessBufferIPP() failed");		   
-
-#ifdef DEBUG_LOG
-
-		            PPM("AFTER IPP Process Buffer");
-
-#endif
-
-		            if(pIPP.hIPP != NULL){
-			            err = DeInitIPP();
-			            if( err )
-				            LOGE("ERROR DeInitIPP() failed");
-			            
-			            pIPP.hIPP = NULL;
-		            }
-
-#ifdef DEBUG_LOG
-
-	                PPM("AFTER IPP Deinit");
-
-#endif
+			            LOGE("ERROR ProcessBufferIPP() failed");
 
                    	if(!(pIPP.ippconfig.isINPLACE)){ 
 		                yuv_buffer = pIPP.pIppOutputBuffer;
-	                }
-	                
+	                }	                
 	                pixelFormat = PIX_YUV420P;
 	            }
     
@@ -2095,7 +2086,9 @@ int CameraHal::ICaptureCreate(void)
 #endif
 #ifdef IMAGE_PROCESSING_PIPELINE
 
-	mippMode=0;
+#ifdef IMAGE_PROCESSING_PIPELINE
+	mippMode = IPP_Disabled_Mode;
+#endif
 
 #endif
 #if JPEG
@@ -2490,6 +2483,7 @@ status_t CameraHal::setParameters(const CameraParameters &params)
 
     int w, h;
     int framerate;
+    int w_orig, h_orig;
     int iso, af, mode, zoom, wb, exposure, scene;
     int effects, compensation, saturation, sharpness;
     int contrast, brightness, flash, caf;
@@ -2533,12 +2527,27 @@ status_t CameraHal::setParameters(const CameraParameters &params)
     framerate = params.getPreviewFrameRate();
     LOGD("FRAMERATE %d", framerate);
 
+    mParameters.getPictureSize(&w_orig, &h_orig);
+
     mParameters = params;
 
 #ifdef IMAGE_PROCESSING_PIPELINE	
-	mippMode=mParameters.getInt("ippMode");
-	LOGD("mippMode=%d",mippMode);
-#endif
+    if((mippMode != mParameters.getInt("ippMode")) ||
+	            (w != w_orig) ||
+	            (h != h_orig) )
+    {
+        mippMode=mParameters.getInt("ippMode");
+        LOGD("mippMode=%d",mippMode);
+
+        if(pIPP.hIPP != NULL){
+            LOGD("pIPP.hIPP=%p", pIPP.hIPP);
+            if(DeInitIPP()) // deinit here to save time
+                LOGE("ERROR DeInitIPP() failed");
+            pIPP.hIPP = NULL;
+        }
+        mIPPToEnable = true;
+    }
+#endif //IMAGE_PROCESSING_PIPELINE
 
 	mParameters.getPictureSize(&w, &h);
 	LOGD("Picture Size by CamHal %d x %d", w, h);
