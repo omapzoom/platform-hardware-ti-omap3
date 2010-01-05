@@ -110,10 +110,6 @@ CameraHal::CameraHal()
 #ifdef IMAGE_PROCESSING_PIPELINE
     pIPP.hIPP = NULL;
 #endif
-    mIPPToEnable = false;
-    #ifdef IMAGE_PROCESSING_PIPELINE
-    pIPP.hIPP = NULL;
-    #endif
 
     int i = 0;
     for(i = 0; i < VIDEO_FRAME_COUNT_MAX; i++)
@@ -1820,17 +1816,12 @@ void CameraHal::procThread()
                     if(ipp_to_enable)
                     {
 #ifdef DEBUG_LOG
-
 		                PPM("Before init IPP");
-
 #endif
-
 	    	            if(InitIPP(image_width, image_height, pixelFormat))
                             LOGE("ERROR InitIPP() failed");
 #ifdef DEBUG_LOG
-
 		                PPM("After IPP Init");
-
 #endif
                     }
 
@@ -1865,6 +1856,11 @@ void CameraHal::procThread()
 		            if( err )
 			            LOGE("ERROR ProcessBufferIPP() failed");
 
+#ifdef DEBUG_LOG
+
+		            PPM("AFTER IPP Process Buffer");
+
+#endif
                    	if(!(pIPP.ippconfig.isINPLACE)){ 
 		                yuv_buffer = pIPP.pIppOutputBuffer;
 	                }
@@ -2087,13 +2083,11 @@ int CameraHal::ICaptureCreate(void)
         isStart_VPP = true;
     }
 #endif
-#ifdef IMAGE_PROCESSING_PIPELINE
 
 #ifdef IMAGE_PROCESSING_PIPELINE
 	mippMode = IPP_Disabled_Mode;
 #endif
 
-#endif
 #if JPEG
     jpegEncoder = new JpegEncoder;
     
@@ -2485,8 +2479,8 @@ status_t CameraHal::setParameters(const CameraParameters &params)
     LOG_FUNCTION_NAME
 
     int w, h;
-    int framerate;
     int w_orig, h_orig;
+    int framerate;
     int iso, af, mode, zoom, wb, exposure, scene;
     int effects, compensation, saturation, sharpness;
     int contrast, brightness, flash, caf;
