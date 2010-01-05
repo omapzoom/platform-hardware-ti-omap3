@@ -473,7 +473,7 @@ int CameraHal::InitIPP(int w, int h, int fmt)
     else {
         mIPPInitAlgoState = true;
     }
-     
+
     pIPP.iStarInArgs = (IPP_StarAlgoInArgs*)((char*)malloc(sizeof(IPP_StarAlgoInArgs) + BUFF_MAP_PADDING_TEST) + PADDING_OFFSET_TEST);
     pIPP.iStarOutArgs = (IPP_StarAlgoOutArgs*)((char*)(malloc(sizeof(IPP_StarAlgoOutArgs) + BUFF_MAP_PADDING_TEST)) + PADDING_OFFSET_TEST);
 
@@ -1047,10 +1047,10 @@ int CameraHal::CapturePicture(){
 
         if(mIPPToEnable)
         {
-    		err = InitIPP(image_width,image_height);
+            err = InitIPP(image_width,image_height);
 	    	if( err ) {
-	    		LOGE("ERROR InitIPP() failed");	
-	    		return -1;	   
+	    		LOGE("ERROR InitIPP() failed");
+	    		return -1;
 	    	}
 	    	PPM("After IPP Init");
             mIPPToEnable = false;
@@ -1070,23 +1070,23 @@ int CameraHal::CapturePicture(){
 				        ipp_luma_nf,
 				        ipp_chroma_nf);
 		if( err ) {
-			LOGE("ERROR ProcessBufferIPP() failed");		   
+			LOGE("ERROR ProcessBufferIPP() failed");
 			return -1;
 		}
 		PPM("AFTER IPP Process Buffer");		
 
-       	if(!(pIPP.ippconfig.isINPLACE)){ 
+        if(!(pIPP.ippconfig.isINPLACE)){
 		    yuv_buffer = pIPP.pIppOutputBuffer;
 	    }
-	     
+
 	    #if ( IPP_YUV422P || IPP_YUV420P_OUTPUT_YUV422I )
-		    jpegFormat = PIX_YUV422I;        
+		    jpegFormat = PIX_YUV422I;
 		    LOGD("YUV422 !!!!");
 	    #else
 		    yuv_len=  ((image_width * image_height *3)/2);
             jpegFormat = PIX_YUV420P;
 		    LOGD("YUV420 !!!!");
-        #endif		
+        #endif
 	}
 	//SaveFile(NULL, (char*)"yuv", yuv_buffer, yuv_len); 
     

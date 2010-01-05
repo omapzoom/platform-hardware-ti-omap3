@@ -110,7 +110,6 @@ CameraHal::CameraHal()
 #ifdef IMAGE_PROCESSING_PIPELINE
     pIPP.hIPP = NULL;
 #endif
-    mIPPInitAlgoState = false;
     mIPPToEnable = false;
     #ifdef IMAGE_PROCESSING_PIPELINE
     pIPP.hIPP = NULL;
@@ -1596,7 +1595,7 @@ void CameraHal::shutterThread()
     fd_set descriptorSet;
     int max_fd;
     int err;
-    unsigned int shutterMessage[3];
+    unsigned int shutterMessage[SHUTTER_THREAD_NUM_ARGS];
     shutter_callback ShutterCallback;
     void *PictureCallbackCookie;
     
@@ -1827,7 +1826,7 @@ void CameraHal::procThread()
 #endif
 
 	    	            if(InitIPP(image_width, image_height, pixelFormat))
-        		            LOGE("ERROR InitIPP() failed");
+                            LOGE("ERROR InitIPP() failed");
 #ifdef DEBUG_LOG
 
 		                PPM("After IPP Init");
@@ -1837,7 +1836,7 @@ void CameraHal::procThread()
 
 		            err = PopulateArgsIPP(image_width, image_height, pixelFormat);
 		            if( err )
-			            LOGE("ERROR PopulateArgsIPP() failed");	   
+			            LOGE("ERROR PopulateArgsIPP() failed");
 
 #ifdef DEBUG_LOG
 
@@ -1868,7 +1867,7 @@ void CameraHal::procThread()
 
                    	if(!(pIPP.ippconfig.isINPLACE)){ 
 		                yuv_buffer = pIPP.pIppOutputBuffer;
-	                }	                
+	                }
 	                pixelFormat = PIX_YUV420P;
 	            }
     
