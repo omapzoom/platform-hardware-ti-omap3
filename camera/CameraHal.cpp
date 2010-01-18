@@ -1033,47 +1033,43 @@ void CameraHal::nextPreview()
     int index;
     recording_callback cb = NULL;
 	
-	//LOG_FUNCTION_NAME
-
     mParameters.getPreviewSize(&w, &h);	
 
     /* De-queue the next avaliable buffer */	
     if (ioctl(camera_device, VIDIOC_DQBUF, &cfilledbuffer) < 0) {
         LOGE("VIDIOC_DQBUF Failed!!!");
-		goto EXIT;
-    }else{
-	    nCameraBuffersQueued--;
-	}
+        goto EXIT;
+    }
+    else nCameraBuffersQueued--;
 
     queue_to_dss_failed = mOverlay->queueBuffer((void*)cfilledbuffer.index);
 
     if (queue_to_dss_failed)
-	{
-		LOGE("nextPreview(): mOverlay->queueBuffer() failed:[%d]",cfilledbuffer.index);
-	}
-	else
-	{
-	    nOverlayBuffersQueued++;
-	    buffers_queued_to_dss[cfilledbuffer.index] = 1; //queued
-	}
+    {
+        LOGE("nextPreview(): mOverlay->queueBuffer() failed:[%d]",cfilledbuffer.index);
+        if (ioctl(camera_device, VIDIOC_QBUF, &cfilledbuffer) < 0) 
+        {
+            LOGE("VIDIOC_QBUF Failed, line=%d",__LINE__);
+        }
+        else nCameraBuffersQueued++;
+    }
+    else
+    {
+        nOverlayBuffersQueued++;
+        buffers_queued_to_dss[cfilledbuffer.index] = 1; //queued
+    }
 
     if (nOverlayBuffersQueued >= NUM_BUFFERS_TO_BE_QUEUED_FOR_OPTIMAL_PERFORMANCE)
     {
-		
         if(mOverlay->dequeueBuffer(&overlaybuffer)){
-			LOGE("nextPreview(): mOverlay->dequeueBuffer() failed");
-		}
-		else{
-        	overlaybufferindex = (int)overlaybuffer;
+            LOGE("nextPreview(): mOverlay->dequeueBuffer() failed");
+        }
+        else{
+            overlaybufferindex = (int)overlaybuffer;
             nOverlayBuffersQueued--;
             buffers_queued_to_dss[(int)overlaybuffer] = 0;
             lastOverlayBufferDQ = (int)overlaybuffer;	
         }
-    }
-    else
-    {
-        //cfilledbuffer.index = whatever was in there before..
-        //That is, queue the same buffer that was dequeued
     }
 
     mRecordingLock.lock();
@@ -1093,43 +1089,46 @@ void CameraHal::nextPreview()
             }
         }
 
-        if (queue_to_dss_failed) {		
-            if (ioctl(camera_device, VIDIOC_QBUF, &cfilledbuffer) < 0) {
-                LOGE("VIDIOC_QBUF Failed, line=%d",__LINE__);
-            }else{
-	            nCameraBuffersQueued++;
-			}
-        }
-        else if (overlaybufferindex != -1) {				
+        if (overlaybufferindex != -1) {				
             if (ioctl(camera_device, VIDIOC_QBUF, &v4l2_cam_buffer[(int)overlaybuffer]) < 0) {
                 LOGE("VIDIOC_QBUF Failed. line=%d",__LINE__);
-            }else{
-	            nCameraBuffersQueued++;
-			}
+            }
+            else nCameraBuffersQueued++;
         }
 
 #else
-        if(overlaybufferindex != -1){
-            //LOGE("<Dqueue>... [index]=%d",cfilledbuffer.index);
-            //LOGE("<Recording>... [index]=%d",overlaybuffer);
-            cb(timeStamp, mVideoBuffer[(int)overlaybuffer], mRecordingCallbackCookie);
-        }
+
+        if(overlaybufferindex != -1)
+        {
+            if (nCameraBuffersQueued == 0)
+            {
+                /* Drop the frame. Camera is starving. */
+                if (ioctl(camera_device, VIDIOC_QBUF, &v4l2_cam_buffer[(int)overlaybuffer]) < 0)
+                {
+                    LOGE("VIDIOC_QBUF Failed. line=%d",__LINE__);
+                }
+                else
+                {
+                    nCameraBuffersQueued++;
+                    LOGD("Didnt queue this buffer to VE");
+                }
+            }
+            else
+            {
+                cb(timeStamp, mVideoBuffer[(int)overlaybuffer], mRecordingCallbackCookie);
+                buffers_queued_to_ve[(int)overlaybuffer] = 1;
+            }
+        }        
+        
 #endif
     } 
     else {
-        if (queue_to_dss_failed) {			
-            if (ioctl(camera_device, VIDIOC_QBUF, &cfilledbuffer) < 0) {
-                LOGE("VIDIOC_QBUF Failed, line=%d",__LINE__);
-            }else{
-	            nCameraBuffersQueued++;
-			}
-        }
-        else if (overlaybufferindex != -1) {		
+
+        if (overlaybufferindex != -1) {		
             if (ioctl(camera_device, VIDIOC_QBUF, &v4l2_cam_buffer[(int)overlaybuffer]) < 0) {
                 LOGE("VIDIOC_QBUF Failed. line=%d",__LINE__);
-            }else{
-	            nCameraBuffersQueued++;
-			}
+            }
+            else nCameraBuffersQueued++;
         }
     }
 
@@ -1138,8 +1137,8 @@ void CameraHal::nextPreview()
 EXIT:
 
     return ;
-}
-	
+}	
+
 #ifdef ICAP
 int  CameraHal::ICapturePerform()
 {
@@ -2268,6 +2267,7 @@ status_t CameraHal::startRecording(recording_callback cb, void* user)
     for(i = 0; i < VIDEO_FRAME_COUNT_MAX; i++)
     {
         mVideoBufferUsing[i] = 0;
+        buffers_queued_to_ve[i] = 0;
     }
 
     mParameters.getPreviewSize(&w, &h);
@@ -2353,10 +2353,27 @@ void CameraHal::stopRecording()
     mRecordingLock.lock();
     mRecordingCallback = NULL;
     mRecordingCallbackCookie = NULL;
-
-
     mRecordingLock.unlock();
+
+    for(int i = 0; i < MAX_CAMERA_BUFFERS; i ++)
+    {
+        if (buffers_queued_to_ve[i] == 1){
+
+            if (ioctl(camera_device, VIDIOC_QBUF, &v4l2_cam_buffer[i]) < 0)
+            {
+                LOGE("VIDIOC_QBUF Failed, index [%d] line=%d",i,__LINE__);
+            }
+            else
+            {
+                nCameraBuffersQueued++;
+            }
+            buffers_queued_to_ve[i] = 0;
+            LOGD("Buffer #%d was not returned by VE. Reclaiming it !!!!!!!!!!!!!!!!!!!!!!!!", i);
+        }        
+    }            
+
 }
+
 
 bool CameraHal::recordingEnabled()
 {
@@ -2383,7 +2400,6 @@ static void debugShowFPS()
 
 void CameraHal::releaseRecordingFrame(const sp<IMemory>& mem)
 {
-    //LOG_FUNCTION_NAME
     ssize_t offset;
     size_t  size;
     int index;
@@ -2391,13 +2407,11 @@ void CameraHal::releaseRecordingFrame(const sp<IMemory>& mem)
 #if USE_NEW_OVERLAY
 
     for(index = 0; index <mVideoBufferCount; index ++){
-//        LOGD("mVideoBuffer[%d]->pointer() %x",index,mVideoBuffer[index]->pointer());
         if(mem->pointer() == mVideoBuffer[index]->pointer()) {
             break;
         }
     }
 
-//    LOGD("index = %d  pointer=0x%x",index,mem->pointer());
 
 #else
     offset = mem->offset();
@@ -2405,18 +2419,33 @@ void CameraHal::releaseRecordingFrame(const sp<IMemory>& mem)
     index = offset / size;
 #endif
 
+    if (index >= mVideoBufferCount)
+    {
+        LOGD(" Received Invalid Buffer Address from OC!!!!!!!!!!!!!!!!");
+        return;
+    }
+       
+    if (buffers_queued_to_ve[index] == 1)
+    {
+        buffers_queued_to_ve[index] = 0;
+    }
+    else
+    {
+        LOGD(" VE returned a Buffer (#%d) that was not queued to it !!!!!!!!!!!!!!!!!!!!!!!!!!", index);        
+        return;
+    }
+
     mRecordingFrameCount++;
 
     debugShowFPS();
 #if USE_MEMCOPY_FOR_VIDEO_FRAME
     mVideoBufferUsing[index] = 0;
 #else
+
     if (ioctl(camera_device, VIDIOC_QBUF, &v4l2_cam_buffer[index]) < 0) {
-        LOGE("VIDIOC_QBUF Failed, index [%d] line=%d",index,__LINE__);
-    } else {
-        //LOGE("releaseRecordingFrame index##[%d]",index);
-	    nCameraBuffersQueued++;
-	}
+       LOGE("VIDIOC_QBUF Failed, index [%d] line=%d",index,__LINE__);
+    } 
+    else nCameraBuffersQueued++;
 
 #endif
     return;
