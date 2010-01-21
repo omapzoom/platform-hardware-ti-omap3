@@ -1035,6 +1035,11 @@ void CameraHal::nextPreview()
 	
     mParameters.getPreviewSize(&w, &h);	
 
+    if (nCameraBuffersQueued == 0) 
+    {   LOGE("Maintaining atleast 1 buffer in camera driver!!!!!!!!!!!!!");
+        return;
+    }
+
     /* De-queue the next avaliable buffer */	
     if (ioctl(camera_device, VIDIOC_DQBUF, &cfilledbuffer) < 0) {
         LOGE("VIDIOC_DQBUF Failed!!!");
@@ -1115,8 +1120,8 @@ void CameraHal::nextPreview()
             }
             else
             {
-                cb(timeStamp, mVideoBuffer[(int)overlaybuffer], mRecordingCallbackCookie);
                 buffers_queued_to_ve[(int)overlaybuffer] = 1;
+                cb(timeStamp, mVideoBuffer[(int)overlaybuffer], mRecordingCallbackCookie);
             }
         }        
         
