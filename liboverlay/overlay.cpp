@@ -1305,6 +1305,13 @@ int overlay_dequeueBuffer
     int rc;
     int i = -1;
 
+    if ( sem_wait( &ctx->shared->lock ) != 0 )
+    {
+        LOGE("%s:%d:Lock Failure!\n", __FUNCTION__, __LINE__);
+        rc = -1;
+        return rc;
+    }
+
     if ( ctx->shared->qd_buf_count <= 1 ) { //dss2 require at least 2 buf queue to perform a dequeue to avoid hang
         LOGE("Not enough buffers to dequeue");
         rc = -EINVAL;
@@ -1327,7 +1334,10 @@ int overlay_dequeueBuffer
         LOGV("INDEX DEQUEUE = %d", i);
         LOGV("qd_buf_count --");
     }
-
+    if ( sem_post( &ctx->shared->lock ) != 0 )
+    {
+        LOGE("%s:%d:Unlock Failure!\n", __FUNCTION__, __LINE__);
+    }
     LOGV("qd_buf_count = %d", ctx->shared->qd_buf_count);
     return ( rc );
 }
