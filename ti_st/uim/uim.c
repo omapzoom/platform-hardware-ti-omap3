@@ -28,6 +28,7 @@
 #include <sys/types.h>
 #ifdef ANDROID
 #include <private/android_filesystem_config.h>
+#include <cutils/log.h>
 #endif
 
 #include "uim.h"
@@ -426,6 +427,7 @@ int st_sig_handler(int signo)
 
 	else {			/* UNINSTALL_N_SHARED - When the Signal is received from KIM */
 
+		UIM_DBG(" Un-Installed N_SHARED Line displine");
 		/* closing UART fd */
 		close(dev_fd);
 		st_state = INSTALL_N_SHARED;
@@ -436,32 +438,36 @@ int st_sig_handler(int signo)
 
 int remove_modules()
 {
+	int err = 0;
 	UIM_VER(" Removing fm_drv ");
 
 	if (rmmod("fm_drv") != 0) {
 		UIM_ERR(" Error removing fm_drv module");
-		return -1;
+		err = -1;
+	} else {
+		UIM_DBG(" Removed fm_drv module");
 	}
-	UIM_DBG(" Removed fm_drv module");
 
 	UIM_VER(" Removing bt_drv ");
 
 	if (rmmod("bt_drv") != 0) {
 		UIM_ERR(" Error removing bt_drv module");
-		return -1;
+		err = -1;
+	} else {
+		UIM_DBG(" Removed bt_drv module");
 	}
-	UIM_DBG(" Removed bt_drv module");
 
 	/*Remove the Shared Transport */
 	UIM_VER(" Removing st_drv ");
 
 	if (rmmod("st_drv") != 0) {
 		UIM_ERR(" Error removing st_drv module");
-		return -1;
+		err = -1;
+	} else {
+		UIM_DBG(" Removed st_drv module ");
 	}
-	UIM_DBG(" Removed st_drv module ");
 
-	return 0;
+	return err;
 }
 
 int change_rfkill_perms(void)
@@ -512,6 +518,7 @@ int main(int argc, char *argv[])
 	char buf[20] = { 0 };
 	char sysfs_entry[20];
 	struct sigaction sa;
+	struct stat file_stat;
 
 	UIM_START_FUNC();
 	err = 0;
@@ -563,28 +570,49 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
-	if (insmod("/st_drv.ko", "") < 0) {
-		UIM_ERR(" Error inserting st_drv module");
-		return -1;
+	if (0 == lstat("/st_drv.ko", &file_stat)) {
+		if (insmod("/st_drv.ko", "") < 0) {
+			UIM_ERR(" Error inserting st_drv module");
+			return -1;
+		} else {
+			UIM_DBG(" Inserted st_drv module");
+		}
+	} else {
+		if (0 == lstat(sysfs_entry, &file_stat)) {
+			UIM_DBG("ST built into the kernel ?");
+		} else {
+			UIM_ERR("BT/FM/GPS would be unavailable on system");
+			UIM_ERR(" sysfs entry %s not found ", sysfs_entry);
+			return -1;
+		}
 	}
-	UIM_DBG(" Inserted st_drv module");
 
 	if (change_rfkill_perms() < 0) {
 		/* possible error condition */
 		UIM_ERR("rfkill not enabled in st_drv - BT on from UI might fail\n");
 	}
 
-	if (insmod("/bt_drv.ko", "") < 0) {
-		UIM_ERR(" Error inserting bt_drv module");
-		return -1;
+	if (0 == lstat("/bt_drv.ko", &file_stat)) {
+		if (insmod("/bt_drv.ko", "") < 0) {
+			UIM_ERR(" Error inserting bt_drv module, NO BT? ");
+		} else {
+			UIM_DBG(" Inserted bt_drv module");
+		}
+	} else {
+		UIM_DBG("BT driver module un-available... ");
+		UIM_DBG("BT driver built into the kernel ?");
 	}
-	UIM_DBG(" Inserted bt_drv module");
 
-	if (insmod("/fm_drv.ko", "") < 0) {
-		UIM_ERR(" Error inserting fm_drv module");
-		return -1;
+	if (0 == lstat("/fm_drv.ko", &file_stat)) {
+		if (insmod("/fm_drv.ko", "") < 0) {
+			UIM_ERR(" Error inserting fm_drv module, NO FM? ");
+		} else {
+			UIM_DBG(" Inserted fm_drv module");
+		}
+	} else {
+		UIM_DBG("FM driver module un-available... ");
+		UIM_DBG("FM driver built into the kernel ?");
 	}
-	UIM_DBG(" Inserted fm_drv module");
 
 	/* Open the sysfs entry created by KIM.
 	 * And share the pid with the KIM
