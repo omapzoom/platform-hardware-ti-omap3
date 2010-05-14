@@ -1842,6 +1842,7 @@ fail_process:
 int CameraHal::ICapturePerform(){
 
     int image_width, image_height;
+    int thumb_width, thumb_height;
     int image_rotation;
     double image_zoom;
 	int preview_width, preview_height;
@@ -1880,6 +1881,18 @@ int CameraHal::ICapturePerform(){
 
     image_rotation = rotation;
     image_zoom = zoom_step[mZoomTargetIdx];
+
+    // swap thumbnail dimensions if rotating
+    if(image_rotation == 90 || image_rotation == 270)
+    {
+        thumb_width = THUMB_HEIGHT;
+        thumb_height = THUMB_WIDTH;
+    }else
+    {
+        thumb_width = THUMB_WIDTH;
+        thumb_height = THUMB_HEIGHT;
+    }
+
 
     format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     format.fmt.pix.width = image_width;
@@ -2186,7 +2199,7 @@ int CameraHal::ICapturePerform(){
 		PPM("BEFORE JPEG Encode Image");
 		LOGE(" outbuffer = 0x%x, jpegSize = %d, yuv_buffer = 0x%x, yuv_len = %d, image_width = %d, image_height = %d, quality = %d, mippMode =%d", outBuffer , jpegSize, yuv_buffer, yuv_len, image_width, image_height, quality,mippMode);
 		jpegEncoder->encodeImage((uint8_t *)outBuffer , jpegSize, yuv_buffer, yuv_len,
-				image_width, image_height, quality, exif_buf, jpegFormat, THUMB_WIDTH, THUMB_HEIGHT, image_width, image_height,
+				image_width, image_height, quality, exif_buf, jpegFormat, thumb_width, thumb_height, image_width, image_height,
 				image_rotation, image_zoom, 0, 0, image_width, image_height);
 		PPM("AFTER JPEG Encode Image");
 
@@ -2625,12 +2638,22 @@ void CameraHal::procThread()
                 JPEGPictureHeap = mJPEGPictureHeap;
                 outBuffer = mJPEGBuffer;
                 offset = mJPEGOffset;
-                thumb_width = THUMB_WIDTH;
-                thumb_height = THUMB_HEIGHT;
                 pixelFormat = PIX_YUV422I;
 
                 input_buffer = yuv_buffer;
                 input_length = yuv_len;
+
+                // swap thumbnail dimensions if rotating
+                if(image_rotation == 90 || image_rotation == 270)
+                {
+                    thumb_width = THUMB_HEIGHT;
+                    thumb_height = THUMB_WIDTH;
+                }else
+                {
+                    thumb_width = THUMB_WIDTH;
+                    thumb_height = THUMB_HEIGHT;
+                }
+
 
 #ifdef IMAGE_PROCESSING_PIPELINE
 
@@ -3669,6 +3692,13 @@ status_t CameraHal::setParameters(const CameraParameters &params)
             rotation = 0; // reset rotation so encoder doesn't not perform any rotation
         } else {
             mExifParams.rotation = -1;
+            // swap exif dimensions if rotating
+            if(rotation == 90 || rotation == 270)
+            {
+                mParameters.getPictureSize(&w, &h);
+                mExifParams.width = h;
+                mExifParams.height = w;
+            }
         }
 
         if(mcaf != caf){

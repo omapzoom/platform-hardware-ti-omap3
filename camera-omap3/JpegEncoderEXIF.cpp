@@ -322,8 +322,8 @@ exif_buffer *get_exif_buffer(void *params, void *gpsLocation)
     exif_entry_set_string (pEd, EXIF_IFD_0, EXIF_TAG_MAKE, "Zoom");
     exif_entry_set_string (pEd, EXIF_IFD_0, EXIF_TAG_MODEL, "SONY IU046");
 
-    exif_entry_set_short(pEd, EXIF_IFD_0, EXIF_TAG_IMAGE_LENGTH, par->width);
-    exif_entry_set_short(pEd, EXIF_IFD_0, EXIF_TAG_IMAGE_WIDTH, par->height);
+    exif_entry_set_short(pEd, EXIF_IFD_0, EXIF_TAG_IMAGE_LENGTH, par->height);
+    exif_entry_set_short(pEd, EXIF_IFD_0, EXIF_TAG_IMAGE_WIDTH, par->width);
 
     switch( par->rotation ) {
         case 0:
