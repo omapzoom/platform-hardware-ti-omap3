@@ -34,24 +34,30 @@
 struct private_module_t;
 struct private_handle_t;
 
-struct private_module_t {
-    gralloc_module_t base;
+#define NUM_FRAMEBUFFERS 1
 
+typedef struct per_framebuffer_t {
     private_handle_t* framebuffer;
     uint32_t flags;
     uint32_t numBuffers;
     uint32_t bufferMask;
-    pthread_mutex_t lock;
     buffer_handle_t currentBuffer;
-    int pmem_master;
-    void* pmem_master_base;
-
     struct fb_var_screeninfo info;
     struct fb_fix_screeninfo finfo;
     float xdpi;
     float ydpi;
     float fps;
+} per_framebuffer_t;
 
+struct private_module_t {
+    gralloc_module_t base;
+
+    pthread_mutex_t lock;
+    int pmem_master;
+    void* pmem_master_base;
+
+    per_framebuffer_t per_fb_data[NUM_FRAMEBUFFERS];
+    
     enum {
         // flag to indicate we'll post this buffer
         PRIV_USAGE_LOCKED_FOR_POST = 0x80000000
@@ -92,14 +98,16 @@ struct private_handle_t {
     int     writeOwner;
     int     pid;
 
+    // holds which fb device... meaningful only if (flags | PRIV_FLAGS_FRAMEBUFFER), -1 otherwise.
+    int     fb_idx;
 #ifdef __cplusplus
-    static const int sNumInts = 8;
+    static const int sNumInts = 9;
     static const int sNumFds = 1;
     static const int sMagic = 0x3141592;
 
-    private_handle_t(int fd, int size, int flags) :
+    private_handle_t(int fd, int size, int flags, int fbidx) :
         fd(fd), magic(sMagic), flags(flags), size(size), offset(0),
-        base(0), lockState(0), writeOwner(0), pid(getpid())
+        base(0), lockState(0), writeOwner(0), pid(getpid()), fb_idx(fbidx)
     {
         version = sizeof(native_handle);
         numInts = sNumInts;

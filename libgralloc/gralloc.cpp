@@ -99,12 +99,7 @@ struct private_module_t HAL_MODULE_INFO_SYM = {
         lock: gralloc_lock,
         unlock: gralloc_unlock,
     },
-    framebuffer: 0,
-    flags: 0,
-    numBuffers: 0,
-    bufferMask: 0,
     lock: PTHREAD_MUTEX_INITIALIZER,
-    currentBuffer: 0,
     pmem_master: -1,
     pmem_master_base: 0
 };
@@ -112,24 +107,24 @@ struct private_module_t HAL_MODULE_INFO_SYM = {
 /*****************************************************************************/
 
 static int gralloc_alloc_framebuffer_locked(alloc_device_t* dev,
-        size_t size, int usage, buffer_handle_t* pHandle)
+        size_t size, int usage, buffer_handle_t* pHandle, int fb_idx)
 {
     private_module_t* m = reinterpret_cast<private_module_t*>(
             dev->common.module);
 
     // allocate the framebuffer
-    if (m->framebuffer == NULL) {
+    if (m->per_fb_data[fb_idx].framebuffer == NULL) {
         // initialize the framebuffer, the framebuffer is mapped once
         // and forever.
-        int err = mapFrameBufferLocked(m);
+        int err = mapFrameBufferLocked(m, fb_idx);
         if (err < 0) {
             return err;
         }
     }
 
-    const uint32_t bufferMask = m->bufferMask;
-    const uint32_t numBuffers = m->numBuffers;
-    const size_t bufferSize = m->finfo.line_length * m->info.yres;
+    const uint32_t bufferMask = m->per_fb_data[fb_idx].bufferMask;
+    const uint32_t numBuffers = m->per_fb_data[fb_idx].numBuffers;
+    const size_t bufferSize = m->per_fb_data[fb_idx].finfo.line_length * m->per_fb_data[fb_idx].info.yres;
     if (numBuffers == 1) {
         // If we have only one buffer, we never use page-flipping. Instead,
         // we return a regular buffer which will be memcpy'ed to the main
@@ -144,34 +139,34 @@ static int gralloc_alloc_framebuffer_locked(alloc_device_t* dev,
     }
 
     // create a "fake" handles for it
-    intptr_t vaddr = intptr_t(m->framebuffer->base);
-    private_handle_t* hnd = new private_handle_t(dup(m->framebuffer->fd), size,
+    intptr_t vaddr = intptr_t(m->per_fb_data[fb_idx].framebuffer->base);
+    private_handle_t* hnd = new private_handle_t(dup(m->per_fb_data[fb_idx].framebuffer->fd), size,
             private_handle_t::PRIV_FLAGS_USES_PMEM |
-            private_handle_t::PRIV_FLAGS_FRAMEBUFFER);
+            private_handle_t::PRIV_FLAGS_FRAMEBUFFER, fb_idx);
 
     // find a free slot
     for (uint32_t i=0 ; i<numBuffers ; i++) {
         if ((bufferMask & (1LU<<i)) == 0) {
-            m->bufferMask |= (1LU<<i);
+            m->per_fb_data[fb_idx].bufferMask |= (1LU<<i);
             break;
         }
         vaddr += bufferSize;
     }
 
     hnd->base = vaddr;
-    hnd->offset = vaddr - intptr_t(m->framebuffer->base);
+    hnd->offset = vaddr - intptr_t(m->per_fb_data[fb_idx].framebuffer->base);
     *pHandle = hnd;
 
     return 0;
 }
 
 static int gralloc_alloc_framebuffer(alloc_device_t* dev,
-        size_t size, int usage, buffer_handle_t* pHandle)
+        size_t size, int usage, buffer_handle_t* pHandle, int fb_idx)
 {
     private_module_t* m = reinterpret_cast<private_module_t*>(
             dev->common.module);
     pthread_mutex_lock(&m->lock);
-    int err = gralloc_alloc_framebuffer_locked(dev, size, usage, pHandle);
+    int err = gralloc_alloc_framebuffer_locked(dev, size, usage, pHandle, fb_idx);
     pthread_mutex_unlock(&m->lock);
     return err;
 }
@@ -325,7 +320,7 @@ try_ashmem:
 #endif // HAVE_ANDROID_OS
 
     if (err == 0) {
-        private_handle_t* hnd = new private_handle_t(fd, size, flags);
+        private_handle_t* hnd = new private_handle_t(fd, size, flags, -1);
         hnd->offset = offset;
         hnd->base = int(base)+offset;
         hnd->lockState = lockState;
@@ -391,7 +386,10 @@ static int gralloc_alloc(alloc_device_t* dev,
 
     int err;
     if (usage & GRALLOC_USAGE_HW_FB) {
-        err = gralloc_alloc_framebuffer(dev, size, usage, pHandle);
+        uint32_t v = (usage & GRALLOC_USAGE_HW_FB) / GRALLOC_USAGE_HW_FB;
+        int fb_idx = 0;
+        while (!(v & (1LU << fb_idx))) { ++fb_idx; }
+        err = gralloc_alloc_framebuffer(dev, size, usage, pHandle, fb_idx);
     } else {
         err = gralloc_alloc_buffer(dev, size, usage, pHandle);
     }
@@ -415,9 +413,11 @@ static int gralloc_free(alloc_device_t* dev,
         // free this buffer
         private_module_t* m = reinterpret_cast<private_module_t*>(
                 dev->common.module);
-        const size_t bufferSize = m->finfo.line_length * m->info.yres;
-        int index = (hnd->base - m->framebuffer->base) / bufferSize;
-        m->bufferMask &= ~(1<<index);
+        int idx = hnd->fb_idx;
+        const size_t bufferSize = m->per_fb_data[idx].finfo.line_length * m->per_fb_data[idx].info.yres;
+        int index = (hnd->base - m->per_fb_data[idx].framebuffer->base) / bufferSize;
+        m->per_fb_data[idx].bufferMask &= ~(1<<index);
+        m->per_fb_data[idx].framebuffer = 0;
     } else {
 #if HAVE_ANDROID_OS
         if (hnd->flags & private_handle_t::PRIV_FLAGS_USES_PMEM) {

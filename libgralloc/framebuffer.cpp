@@ -53,6 +53,8 @@ enum {
 
 struct fb_context_t {
     framebuffer_device_t  device;
+    /* private data */
+    int fb_idx;
 };
 
 /*****************************************************************************/
@@ -74,11 +76,12 @@ static int fb_setUpdateRect(struct framebuffer_device_t* dev,
         return -EINVAL;
 
     fb_context_t* ctx = (fb_context_t*)dev;
+    int idx = ctx->fb_idx;
     private_module_t* m = reinterpret_cast<private_module_t*>(
             dev->common.module);
-    m->info.reserved[0] = 0x54445055; // "UPDT";
-    m->info.reserved[1] = (uint16_t)l | ((uint32_t)t << 16);
-    m->info.reserved[2] = (uint16_t)(l+w) | ((uint32_t)(t+h) << 16);
+    m->per_fb_data[idx].info.reserved[0] = 0x54445055; // "UPDT";
+    m->per_fb_data[idx].info.reserved[1] = (uint16_t)l | ((uint32_t)t << 16);
+    m->per_fb_data[idx].info.reserved[2] = (uint16_t)(l+w) | ((uint32_t)(t+h) << 16);
     return 0;
 }
 
@@ -88,31 +91,32 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
         return -EINVAL;
 
     fb_context_t* ctx = (fb_context_t*)dev;
+    int idx = ctx->fb_idx;
 
     private_handle_t const* hnd = reinterpret_cast<private_handle_t const*>(buffer);
     private_module_t* m = reinterpret_cast<private_module_t*>(
             dev->common.module);
 
-    if (m->currentBuffer) {
-        m->base.unlock(&m->base, m->currentBuffer);
-        m->currentBuffer = 0;
+    if (m->per_fb_data[idx].currentBuffer) {
+        m->base.unlock(&m->base, m->per_fb_data[idx].currentBuffer);
+        m->per_fb_data[idx].currentBuffer = 0;
     }
 
     if (hnd->flags & private_handle_t::PRIV_FLAGS_FRAMEBUFFER) {
 
         m->base.lock(&m->base, buffer,
                 private_module_t::PRIV_USAGE_LOCKED_FOR_POST,
-                0, 0, m->info.xres, m->info.yres, NULL);
+                0, 0, m->per_fb_data[idx].info.xres, m->per_fb_data[idx].info.yres, NULL);
 
-        const size_t offset = hnd->base - m->framebuffer->base;
-        m->info.activate = FB_ACTIVATE_VBL;
-        m->info.yoffset = offset / m->finfo.line_length;
-        if (ioctl(m->framebuffer->fd, FBIOPUT_VSCREENINFO, &m->info) == -1) {
+        const size_t offset = hnd->base - m->per_fb_data[idx].framebuffer->base;
+        m->per_fb_data[idx].info.activate = FB_ACTIVATE_VBL;
+        m->per_fb_data[idx].info.yoffset = offset / m->per_fb_data[idx].finfo.line_length;
+        if (ioctl(m->per_fb_data[idx].framebuffer->fd, FBIOPUT_VSCREENINFO, &m->per_fb_data[idx].info) == -1) {
             LOGE("FBIOPUT_VSCREENINFO failed");
             m->base.unlock(&m->base, buffer);
             return -errno;
         }
-        m->currentBuffer = buffer;
+        m->per_fb_data[idx].currentBuffer = buffer;
 
     } else {
         // If we can't do the page_flip, just copy the buffer to the front
@@ -121,20 +125,20 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
         void* fb_vaddr;
         void* buffer_vaddr;
 
-        m->base.lock(&m->base, m->framebuffer,
+        m->base.lock(&m->base, m->per_fb_data[idx].framebuffer,
                 GRALLOC_USAGE_SW_WRITE_RARELY,
-                0, 0, m->info.xres, m->info.yres,
+                0, 0, m->per_fb_data[idx].info.xres, m->per_fb_data[idx].info.yres,
                 &fb_vaddr);
 
         m->base.lock(&m->base, buffer,
                 GRALLOC_USAGE_SW_READ_RARELY,
-                0, 0, m->info.xres, m->info.yres,
+                0, 0, m->per_fb_data[idx].info.xres, m->per_fb_data[idx].info.yres,
                 &buffer_vaddr);
 
-        memcpy(fb_vaddr, buffer_vaddr, m->finfo.line_length * m->info.yres);
+        memcpy(fb_vaddr, buffer_vaddr, m->per_fb_data[idx].finfo.line_length * m->per_fb_data[idx].info.yres);
 
         m->base.unlock(&m->base, buffer);
-        m->base.unlock(&m->base, m->framebuffer);
+        m->base.unlock(&m->base, m->per_fb_data[idx].framebuffer);
     }
 
     return 0;
@@ -142,10 +146,10 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
 
 /*****************************************************************************/
 
-int mapFrameBufferLocked(struct private_module_t* module)
+int mapFrameBufferLocked(struct private_module_t* module, int fb_idx)
 {
     // already initialized...
-    if (module->framebuffer) {
+    if (module->per_fb_data[fb_idx].framebuffer) {
         return 0;
     }
 
@@ -159,7 +163,7 @@ int mapFrameBufferLocked(struct private_module_t* module)
     char name[64];
 
     while ((fd==-1) && device_template[i]) {
-        snprintf(name, 64, device_template[i], 0);
+        snprintf(name, 64, device_template[i], fb_idx);
         fd = open(name, O_RDWR, 0);
         i++;
     }
@@ -279,12 +283,12 @@ int mapFrameBufferLocked(struct private_module_t* module)
         return -errno;
 
 
-    module->flags = flags;
-    module->info = info;
-    module->finfo = finfo;
-    module->xdpi = xdpi;
-    module->ydpi = ydpi;
-    module->fps = fps;
+    module->per_fb_data[fb_idx].flags = flags;
+    module->per_fb_data[fb_idx].info = info;
+    module->per_fb_data[fb_idx].finfo = finfo;
+    module->per_fb_data[fb_idx].xdpi = xdpi;
+    module->per_fb_data[fb_idx].ydpi = ydpi;
+    module->per_fb_data[fb_idx].fps = fps;
 
     /*
      * map the framebuffer
@@ -292,26 +296,26 @@ int mapFrameBufferLocked(struct private_module_t* module)
 
     int err;
     size_t fbSize = roundUpToPageSize(finfo.line_length * info.yres_virtual);
-    module->framebuffer = new private_handle_t(dup(fd), fbSize,
-            private_handle_t::PRIV_FLAGS_USES_PMEM);
+    module->per_fb_data[fb_idx].framebuffer = new private_handle_t(dup(fd), fbSize,
+            private_handle_t::PRIV_FLAGS_USES_PMEM, -1);
 
-    module->numBuffers = info.yres_virtual / info.yres;
-    module->bufferMask = 0;
+    module->per_fb_data[fb_idx].numBuffers = info.yres_virtual / info.yres;
+    module->per_fb_data[fb_idx].bufferMask = 0;
 
     void* vaddr = mmap(0, fbSize, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
     if (vaddr == MAP_FAILED) {
         LOGE("Error mapping the framebuffer (%s)", strerror(errno));
         return -errno;
     }
-    module->framebuffer->base = intptr_t(vaddr);
+    module->per_fb_data[fb_idx].framebuffer->base = intptr_t(vaddr);
     memset(vaddr, 0, fbSize);
     return 0;
 }
 
-static int mapFrameBuffer(struct private_module_t* module)
+static int mapFrameBuffer(struct private_module_t* module, int fb_idx)
 {
     pthread_mutex_lock(&module->lock);
-    int err = mapFrameBufferLocked(module);
+    int err = mapFrameBufferLocked(module, fb_idx);
     pthread_mutex_unlock(&module->lock);
     return err;
 }
@@ -337,6 +341,10 @@ int fb_device_open(hw_module_t const* module, const char* name,
         if (status < 0)
             return status;
 
+        /* derive fb no from name : "fb0"->0, "fb1"->1, etc. */
+        int idx;
+        sscanf(name, "fb%d", &idx);
+
         /* initialize our state here */
         fb_context_t *dev = (fb_context_t*)malloc(sizeof(*dev));
         memset(dev, 0, sizeof(*dev));
@@ -349,19 +357,20 @@ int fb_device_open(hw_module_t const* module, const char* name,
         dev->device.setSwapInterval = fb_setSwapInterval;
         dev->device.post            = fb_post;
         dev->device.setUpdateRect = 0;
+        dev->fb_idx = idx;
 
         private_module_t* m = (private_module_t*)module;
-        status = mapFrameBuffer(m);
+        status = mapFrameBuffer(m, idx);
         if (status >= 0) {
-            int stride = m->finfo.line_length / (m->info.bits_per_pixel >> 3);
+            int stride = m->per_fb_data[idx].finfo.line_length / (m->per_fb_data[idx].info.bits_per_pixel >> 3);
             const_cast<uint32_t&>(dev->device.flags) = 0;
-            const_cast<uint32_t&>(dev->device.width) = m->info.xres;
-            const_cast<uint32_t&>(dev->device.height) = m->info.yres;
+            const_cast<uint32_t&>(dev->device.width) = m->per_fb_data[idx].info.xres;
+            const_cast<uint32_t&>(dev->device.height) = m->per_fb_data[idx].info.yres;
             const_cast<int&>(dev->device.stride) = stride;
             const_cast<int&>(dev->device.format) = HAL_PIXEL_FORMAT_RGB_565;
-            const_cast<float&>(dev->device.xdpi) = m->xdpi;
-            const_cast<float&>(dev->device.ydpi) = m->ydpi;
-            const_cast<float&>(dev->device.fps) = m->fps;
+            const_cast<float&>(dev->device.xdpi) = m->per_fb_data[idx].xdpi;
+            const_cast<float&>(dev->device.ydpi) = m->per_fb_data[idx].ydpi;
+            const_cast<float&>(dev->device.fps) = m->per_fb_data[idx].fps;
             const_cast<int&>(dev->device.minSwapInterval) = 1;
             const_cast<int&>(dev->device.maxSwapInterval) = 1;
             *device = &dev->device.common;
