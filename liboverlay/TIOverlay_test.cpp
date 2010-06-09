@@ -807,7 +807,7 @@ if (zoom1) {
 */
 void OverlayTest::testErrorScenarios()
 {
-    /** the test scenarios to be tested
+    /** the error scenarios to be tested
     *<1>Passing NULL arguments
     *<2>passing Invalid argumnets
     *<3>requesting for que buffers beyond max
@@ -946,6 +946,9 @@ void OverlayTest::testErrorScenarios()
     ret = mOverlay1->setParameter(OPTIMAL_QBUF_CNT, NUM_OVERLAY_BUFFERS_REQUESTED*2);
     RET_CHECK_EQ(ret, 0, __LINE__);
 
+    ret = mOverlay1->setParameter(OPTIMAL_QBUF_CNT, NUM_OVERLAY_BUFFERS_REQUESTED/2);
+    RET_CHECK_EQ(ret, 0, __LINE__);
+
     //test crop api for errors
     ret = mOverlay1->setCrop(0,0, 100,100);
     RET_CHECK_EQ(ret, 0, __LINE__);
@@ -957,7 +960,8 @@ void OverlayTest::testErrorScenarios()
     RET_CHECK_NOTEQ(ret, 0, __LINE__);
 
     ret = mOverlay1->setCrop(10,10, MAX_OVERLAY_WIDTH_VAL*2,MAX_OVERLAY_HEIGHT_VAL*2);
-    RET_CHECK_EQ(ret, 0, __LINE__);
+    RET_CHECK_NOTEQ(ret, 0, __LINE__);
+
     //get buffer addresses beyond the max buffer cnt
     int numBuffers1 = mOverlay1->getBufferCount();
     mapping_data_t* data1;
@@ -973,6 +977,7 @@ void OverlayTest::testErrorScenarios()
         }
         mBuffers1[i1] = data1;
     }
+
     overlay_buffer_t buffer1;
     //start dequeing buffering, even before queing
     ret = mOverlay1->dequeueBuffer(&buffer1);
