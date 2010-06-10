@@ -3208,7 +3208,7 @@ status_t CameraHal::convertGPSCoord(double coord, int *deg, int *min, int *sec)
     
     LOG_FUNCTION_NAME
 
-    if ( coord < 0 ) {
+    if ( coord == 0 ) {
         
         LOGE("Invalid GPS coordinate");
         
