@@ -71,9 +71,9 @@ AndroidSurfaceOutputOmap34xx::~AndroidSurfaceOutputOmap34xx()
     mUseOverlay = false;
     mInitialized = false;
     
-    if(mOverlay != NULL){
+    if(mOverlay.get() != NULL){
         mOverlay->destroy();
-        mOverlay = NULL;
+        mOverlay.clear();
     }
 }
 
@@ -121,7 +121,7 @@ bool AndroidSurfaceOutputOmap34xx::initCheck()
 #endif
     mapping_data_t *data;
     if (mUseOverlay) {
-        if(mOverlay == NULL){
+        if(mOverlay.get() == NULL){
             LOGV("using Vendor Speicifc(34xx) codec");
             sp<OverlayRef> ref = mSurface->createOverlay(displayWidth, displayHeight,videoFormat);
             if(ref != NULL)LOGV("Vendor Speicifc(34xx)MIO: overlay created ");
