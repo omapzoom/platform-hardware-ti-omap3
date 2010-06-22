@@ -76,7 +76,6 @@
 int hMediaFile = -1;		/* class driver handle */
 static ULONG usage_count;
 static sem_t semOpenClose;
-static bool bridge_sem_initialized = false;
 
 /*  ----------------------------------- Definitions */
 /* #define BRIDGE_DRIVER_NAME  "/dev/dspbridge"*/
@@ -88,6 +87,17 @@ static bool bridge_sem_initialized = false;
 #define RETENTION		0x8
 #define MPU_HIB			0x7
 #define SLEEP_TRANSITION	0x6
+
+static void start(void) __attribute__((constructor));
+
+void start(void)
+{
+	if (sem_init(&semOpenClose, 0, 1) == -1)
+		DEBUGMSG(DSPAPI_ZONE_ERROR,
+			(TEXT("MGR: Failed to Initialize"
+				"the bridge semaphore\n")));
+}
+
 /*
  *  ======== DspManager_Open ========
  *  Purpose:
@@ -114,16 +124,6 @@ DBAPI DspManager_Open(UINT argc, PVOID argp)
 		return DSP_EFAIL;
 	}
 open:
-	if (!bridge_sem_initialized) {
-		if (sem_init(&semOpenClose, 0, 1) == -1) {
-			DEBUGMSG(DSPAPI_ZONE_ERROR,
-				 (TEXT("MGR: Failed to Initialize"
-					   "the bridge semaphore\n")));
-			return DSP_EFAIL;
-		} else
-			bridge_sem_initialized = true;
-	}
-
 	sem_wait(&semOpenClose);
 	if (usage_count == 0) {	/* try opening handle to Bridge driver */
 		status = open(BRIDGE_DRIVER_NAME, O_RDWR);
