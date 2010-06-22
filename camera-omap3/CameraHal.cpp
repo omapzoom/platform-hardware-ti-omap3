@@ -3603,7 +3603,10 @@ status_t CameraHal::setParameters(const CameraParameters &params)
         }
 
         if(brightness != -1) 
+        {
+            brightness -= BRIGHTNESS_OFFSET;
             fobj->settings_2a.general.brightness = brightness;
+        }
 
         if(saturation != -1)
             fobj->settings_2a.general.saturation = saturation;
