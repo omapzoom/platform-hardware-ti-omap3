@@ -87,6 +87,7 @@ int jpegQuality = 85;
 timeval autofocus_start, picture_start;
 char script_name[25];
 char dir_path[40]="/sdcard/";
+bool nullOverlay = false;
 
 const char *ipp_mode[] = { "off", "Chroma Suppression", "Edge Enhancement" };
 const char *iso [] = { "auto", "100", "200", "400", "800"};
@@ -415,6 +416,8 @@ void debugShowFPS()
 
 /** Callback for startPreview() */
 void my_preview_callback(const sp<IMemory>& mem) {
+
+    printf("PREVIEW Callback 0x%x", mem->pointer());
     if (dump_preview) {
         saveFile(mem);
         dump_preview = 0;
@@ -784,16 +787,25 @@ int startPreview() {
         }
 
         params.unflatten(camera->getParameters());
+
         params.setPreviewSize(previewSize[previewSizeIDX].width, previewSize[previewSizeIDX].height);
         params.setPictureSize(captureSize[captureSizeIDX].width, captureSize[captureSizeIDX].height);
 
         camera->setParameters(params.flatten());
 
-        if ( createPreviewSurface(previewSize[previewSizeIDX].width, previewSize[previewSizeIDX].height ) < 0 ) {
-            printf("Error while creating preview surface\n");
+        if(!nullOverlay) {
+            printf("Creating preview surface...\n");
+            if ( createPreviewSurface(previewSize[previewSizeIDX].width, previewSize[previewSizeIDX].height ) < 0 ) {
+                printf("Error while creating preview surface\n");
+               return -1;
+                }
 
-            return -1;
+        } else {
+            printf("Not creating preview surface...\n");
+            overlaySurface = NULL;
         }
+
+
 
         camera->setPreviewDisplay(overlaySurface);
 
@@ -809,11 +821,18 @@ int startPreview() {
 
         camera->setParameters(params.flatten());
 
-        if ( createPreviewSurface(previewSize[previewSizeIDX].width, previewSize[previewSizeIDX].height ) < 0 ) {
-            printf("Error while creating preview surface\n");
+        if(!nullOverlay) {
+            if ( createPreviewSurface(previewSize[previewSizeIDX].width, previewSize[previewSizeIDX].height ) < 0 ) {
+                printf("Error while creating preview surface\n");
 
-            return -1;
+
+                    return -1;
+                }
+
+        } else {
+            overlaySurface = NULL;
         }
+
 
         camera->setPreviewDisplay(overlaySurface);
 
@@ -831,11 +850,15 @@ void stopPreview() {
     if ( hardwareActive ) {
         camera->stopPreview();
         closeCamera();
+        if(!nullOverlay)
         destroyPreviewSurface();
 
         previewRunning  = false;
         reSizePreview = true;
         hardwareActive = false;
+
+        ///Reset preview size back to default
+        previewSizeIDX = ARRAY_SIZE(previewSize) - 5;
     }
 }
 
@@ -1213,6 +1236,13 @@ int functional_menu() {
             break;
         }
 
+        case 'N':
+        case 'n':
+        {
+            nullOverlay = true;
+            break;
+        }
+
         case 'k':
         case 'K':
             ippIDX += 1;
@@ -1447,7 +1477,9 @@ int functional_menu() {
             break;
 
         case '&':
+            printf("Enabling Preview Callback");
             dump_preview = 1;
+            camera->setPreviewCallbackFlags(FRAME_CALLBACK_FLAG_ENABLE_MASK);
             break;
 
         case 'a':
@@ -1800,9 +1832,13 @@ int execute_functional_script(char *script) {
 
                 break;
 
+
             case '&':
+                printf("Enabling Preview Callback");
                 dump_preview = 1;
+                camera->setPreviewCallbackFlags(FRAME_CALLBACK_FLAG_ENABLE_MASK);
                 break;
+
 
             case 'k':
             case 'K':
@@ -2019,6 +2055,13 @@ int execute_functional_script(char *script) {
                 {
                     camera->setParameters(params.flatten());
                 }
+                break;
+            }
+
+            case 'N':
+            case 'n':
+            {
+                nullOverlay = true;
                 break;
             }
 
