@@ -127,11 +127,11 @@ LOCAL_SHARED_LIBRARIES:= \
     librcm \
     libipc \
     libcamera \
+    libomx_rpc \
 
 
 
 LOCAL_STATIC_LIBRARIES:= \
-	libomx_rpc \
 
 
 
