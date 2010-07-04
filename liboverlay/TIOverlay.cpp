@@ -1684,17 +1684,16 @@ int overlay_data_context_t::overlay_data_close(struct hw_device_t *dev) {
             LOGE("Stream Off Failed!/%d\n", rc);
         }
 
-        for (i = 0; i < ctx->omap_overlay->num_buffers; i++) {
+        for (i = 0; i < ctx->omap_overlay->mappedbufcount; i++) {
             LOGV("Unmap Buffer/%d/%08lx/%d", i, (unsigned long)ctx->omap_overlay->buffers[i], ctx->omap_overlay->buffers_len[i] );
             rc = v4l2_overlay_unmap_buf(ctx->omap_overlay->buffers[i], ctx->omap_overlay->buffers_len[i]);
             if (rc != 0) {
                 LOGE("Error unmapping the buffer/%d/%d", i, rc);
             }
         }
-
-        delete(ctx->omap_overlay->mapping_data);
-        delete(ctx->omap_overlay->buffers);
-        delete(ctx->omap_overlay->buffers_len);
+        delete (ctx->omap_overlay->mapping_data);
+        delete [](ctx->omap_overlay->buffers);
+        delete [](ctx->omap_overlay->buffers_len);
         ctx->omap_overlay->mapping_data = NULL;
         ctx->omap_overlay->buffers = NULL;
         ctx->omap_overlay->buffers_len = NULL;
