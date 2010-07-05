@@ -227,6 +227,13 @@ public:
     ///Class declarations
     ///@remarks Add a new class for a new event type added above
 
+	//Shutter event specific data
+	typedef struct ShutterEventData_t
+    	{
+    	bool shutterClosed;
+
+    	}ShutterEventData;
+
     ///Focus event specific data
     typedef struct FocusEventData_t
         {
@@ -246,6 +253,7 @@ public:
         {
         CameraHalEvent::FocusEventData focusEvent;
         CameraHalEvent::ZoomEventData zoomEvent;
+		CameraHalEvent::ShutterEventData shutterEvent;
         } CameraHalEventData;
 
     //default contrustor
