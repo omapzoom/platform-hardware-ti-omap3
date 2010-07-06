@@ -26,6 +26,7 @@
 #define PRINTOVER(arg...)     LOGD(#arg)
 #define LOG_FUNCTION_NAME         LOGD("%d: %s() ENTER", __LINE__, __FUNCTION__);
 #define LOG_FUNCTION_NAME_EXIT    LOGD("%d: %s() EXIT", __LINE__, __FUNCTION__);
+#define KEY_CAMERA          "camera-index"
 #define KEY_SATURATION      "saturation"
 #define KEY_BRIGHTNESS      "brightness"
 #define KEY_BURST           "burst-capture"
@@ -45,7 +46,7 @@
 #define KEY_IPP             "ippMode"
 #define KEY_BUFF_STARV      "buff-starvation"
 
-#define SDCARD_PATH "/sdcard/"
+#define SDCARD_PATH "/"
 
 #define MAX_BURST   15
 #define BURST_INC     5
@@ -63,6 +64,7 @@
 
 using namespace android;
 
+int camera_index = 0;
 int print_menu;
 sp<Camera> camera;
 sp<MediaRecorder> recorder;
@@ -79,6 +81,10 @@ int awb_mode = 0;
 int effects_mode = 0;
 int scene_mode = 0;
 int caf_mode = 0;
+int vnf_mode = 0;
+int vstab_mode = 0;
+
+
 int rotation = 0;
 bool reSizePreview = true;
 bool hardwareActive = false;
@@ -108,6 +114,8 @@ int prevcnt = 0;
 
 char dir_path[40] = SDCARD_PATH;
 
+const char *cameras[] = {"Primary Camera", "Secondary Camera 1", "Secondary Camera 2", "Stereo Camera"};
+
 const char *ipp_mode[] = { "off", "Chroma Suppression", "Edge Enhancement" };
 const char *iso [] = { "auto", "100", "200", "400", "800"};
 const char *effects [] = {
@@ -122,6 +130,10 @@ const char *effects [] = {
     "emboss",
 };
 const char *caf [] = { "Off", "On" };
+const char *vnf [] = { "Off", "On" };
+const char *vstab [] = { "Off", "On" };
+
+
 const char *scene [] = {
     "auto",
     "portrait",
@@ -155,7 +167,7 @@ int focus_mode = 0;
 const char *pixelformat[] = {"yuv422i-yuyv", "yuv420sp", "rgb565", "jpeg"};
 int pictureFormat = ARRAY_SIZE(pixelformat) - 1;
 const char *exposure[] = {"Auto", "Macro", "Portrait", "Landscape", "Sports", "Night", "Night Portrait", "Backlighting", "Manual"};
-const char *capture[] = { "High Performance", "High Quality" };
+const char *capture[] = { "High Performance", "High Quality", "Video Mode" };
 const struct {
     int idx;
     const char *zoom_description;
@@ -421,6 +433,25 @@ out:
     LOG_FUNCTION_NAME_EXIT
 }
 
+void printSupportedParams()
+{
+    printf("\n\r\tSupported Cameras: %s", params.get("camera-indexes"));
+    printf("\n\r\tSupported Picture Sizes: %s", params.get(CameraParameters::KEY_SUPPORTED_PICTURE_SIZES));
+    printf("\n\r\tSupported Picture Formats: %s", params.get(CameraParameters::KEY_SUPPORTED_PICTURE_FORMATS));
+    printf("\n\r\tSupported Preview Sizes: %s", params.get(CameraParameters::KEY_SUPPORTED_PREVIEW_SIZES));
+    printf("\n\r\tSupported Preview Formats: %s", params.get(CameraParameters::KEY_SUPPORTED_PREVIEW_FORMATS));
+    printf("\n\r\tSupported Preview Frame Rates: %s", params.get(CameraParameters::KEY_SUPPORTED_PREVIEW_FRAME_RATES));
+    printf("\n\r\tSupported Thumbnail Sizes: %s", params.get(CameraParameters::KEY_SUPPORTED_THUMBNAIL_SIZES));
+    printf("\n\r\tSupported Whitebalance Modes: %s", params.get(CameraParameters::KEY_SUPPORTED_WHITE_BALANCE));
+    printf("\n\r\tSupported Effects: %s", params.get(CameraParameters::KEY_SUPPORTED_EFFECTS));
+    printf("\n\r\tSupported Scene Modes: %s", params.get(CameraParameters::KEY_SUPPORTED_SCENE_MODES));
+    printf("\n\r\tSupported Focus Modes: %s", params.get(CameraParameters::KEY_SUPPORTED_FOCUS_MODES));
+    printf("\n\r\tSupported Antibanding Options: %s", params.get(CameraParameters::KEY_SUPPORTED_ANTIBANDING));
+    printf("\n\r\tSupported Flash Modes: %s", params.get(CameraParameters::KEY_SUPPORTED_FLASH_MODES));
+
+    return;
+}
+
 void debugShowFPS()
 {
     static int mFrameCount = 0;
@@ -530,6 +561,10 @@ void CameraHandler::postData(int32_t msgType, const sp<IMemory>& dataPtr) {
         my_raw_callback(dataPtr);
     }
 
+    if (msgType & CAMERA_MSG_POSTVIEW_FRAME) {
+        printf("Postview frame %llu us\n", timeval_delay(&picture_start));
+    }
+
     if (msgType & CAMERA_MSG_COMPRESSED_IMAGE ) {
         printf("JPEG done in %llu us\n", timeval_delay(&picture_start));
         my_jpeg_callback(dataPtr);
@@ -541,14 +576,9 @@ void CameraHandler::postDataTimestamp(nsecs_t timestamp, int32_t msgType, const 
     printf("Recording cb: %d %lld %p\n", msgType, timestamp, dataPtr.get());
 
     static uint32_t count = 0;
-    if(count>200)
-        {
-        camera->stopRecording();
-        count = 0;
-        }
 
-    if(count==100)
-    saveFile(dataPtr);
+    //if(count==100)
+    //saveFile(dataPtr);
 
     count++;
 
@@ -927,6 +957,7 @@ void stopPreview() {
 }
 
 void initDefaults() {
+    camera_index = 0;
     antibanding_mode = 0;
     focus_mode = 0;
     previewSizeIDX = ARRAY_SIZE(previewSize) - 6;  /* Default resolution set to WVGA */
@@ -939,6 +970,8 @@ void initDefaults() {
     effects_mode = 0;
     scene_mode = 0;
     caf_mode = 0;
+    vnf_mode = 0;
+    vstab_mode = 0;
     rotation = 0;
     saturation = 0;
     zoomIDX = 0;
@@ -947,7 +980,7 @@ void initDefaults() {
     brightness = 100;
     sharpness = 0;
     iso_mode = 0;
-    capture_mode = 0;
+    capture_mode = 1;
     exposure_mode = 0;
     ippIDX = 0;
     jpegQuality = 85;
@@ -1069,14 +1102,17 @@ int functional_menu() {
 
         printf("\n\n=========== FUNCTIONAL TEST MENU ===================\n\n");
 
-        printf(" \n\nSTART / STOP SERVICES \n");
+        printf(" \n\nSTART / STOP / GENERAL SERVICES \n");
         printf(" -----------------------------\n");
+        printf("   A  Select Camera %s\n", cameras[camera_index]);
         printf("   [. Resume Preview after capture\n");
         printf("   0. Reset to defaults\n");
         printf("   q. Quit\n");
         printf("   @. Disconnect and Reconnect to CameraService \n");
         printf("   /. Enable/Disable showfps: %s\n", ((showfps)? "Enabled":"Disabled"));
         printf("   a. GEO tagging settings menu\n");
+        printf("   E.  Camera Capability Dump");
+
 
         printf(" \n\n PREVIEW SUB MENU \n");
         printf(" -----------------------------\n");
@@ -1111,8 +1147,9 @@ int functional_menu() {
         printf("   d. Audio Codec:    %s\n", audioCodecs[audioCodecIDX].desc);
         printf("   v. Output Format:  %s\n", outputFormat[outputFormatIDX].desc);
         printf("   r. Framerate:     %3d\n", frameRate[frameRateIDX].fps);
-        printf("   ?. Setup Video Recording Mode\n");
         printf("   *. Start Video Recording dump ( 1 raw frame ) \n");
+        printf("   B  VNF              %s", vnf[vnf_mode]);
+        printf("   C  VSTAB              %s", vstab[vstab_mode]);
 
         printf(" \n\n 3A SETTING SUB MENU \n");
         printf(" -----------------------------\n");
@@ -1142,6 +1179,15 @@ int functional_menu() {
     print_menu = 1;
 
     switch (ch) {
+
+    case 'A':
+        camera_index++;
+        camera_index %= ARRAY_SIZE(cameras);
+        params.set(KEY_CAMERA, camera_index);
+
+        if ( hardwareActive )
+            camera->setParameters(params.flatten());
+        break;
     case '[':
         if ( hardwareActive )
             camera->startPreview();
@@ -1323,13 +1369,34 @@ int functional_menu() {
                 camera->setParameters(params.flatten());
             break;
 
-        case '?' :
-            ///Set mode=3 to select video mode
-            params.set(KEY_MODE, 3);
-            params.set(KEY_VNF, 1);
-            params.set(KEY_VSTAB, 1);
+        case 'B' :
+            vnf_mode++;
+            vnf_mode %= ARRAY_SIZE(vnf);
+            params.set(KEY_VNF, vnf_mode);
+
             if ( hardwareActive )
                 camera->setParameters(params.flatten());
+
+
+        case 'C' :
+            vstab_mode++;
+            vstab_mode %= ARRAY_SIZE(vstab);
+            params.set(KEY_VSTAB, vstab_mode);
+
+            if ( hardwareActive )
+                camera->setParameters(params.flatten());
+            break;
+
+
+        case 'D':
+            if ( hardwareActive )
+                camera->stopRecording();
+            break;
+
+        case 'E':
+            if(hardwareActive)
+                params.unflatten(camera->getParameters());
+            printSupportedParams();
             break;
 
         case '*':
@@ -1338,7 +1405,6 @@ int functional_menu() {
             break;
 
         case 'o':
-        case 'O':
             if ( jpegQuality >= 100) {
                 jpegQuality = 0;
             } else {
@@ -1350,7 +1416,6 @@ int functional_menu() {
                 camera->setParameters(params.flatten());
             break;
 
-        case 'M':
         case 'm':
         {
             meter_mode = (meter_mode + 1)%ARRAY_SIZE(metering);
@@ -1358,7 +1423,6 @@ int functional_menu() {
             break;
         }
 
-        case 'N':
         case 'n':
         {
             nullOverlay = true;
@@ -1366,7 +1430,6 @@ int functional_menu() {
         }
 
         case 'k':
-        case 'K':
             ippIDX += 1;
             ippIDX %= ARRAY_SIZE(ipp_mode);
             params.set(KEY_IPP, ippIDX);
@@ -1406,7 +1469,6 @@ int functional_menu() {
             break;
 
         case 'u':
-        case 'U':
             capture_mode++;
             capture_mode %= ARRAY_SIZE(capture);
             params.set(KEY_MODE, (capture_mode + 1));
@@ -1417,7 +1479,6 @@ int functional_menu() {
             break;
 
         case 'w':
-        case 'W':
             scene_mode++;
             scene_mode %= ARRAY_SIZE(scene);
             params.set(params.KEY_SCENE_MODE, scene[scene_mode]);
@@ -1428,7 +1489,6 @@ int functional_menu() {
             break;
 
         case 'y':
-        case 'Y':
             caf_mode++;
             caf_mode %= ARRAY_SIZE(caf);
             params.set(KEY_CAF, caf_mode);
@@ -1439,7 +1499,6 @@ int functional_menu() {
             break;
 
         case 'i':
-        case 'I':
             iso_mode++;
             iso_mode %= ARRAY_SIZE(iso);
             params.set(KEY_ISO, iso_mode);
@@ -1449,7 +1508,6 @@ int functional_menu() {
             break;
 
         case 'h':
-        case 'H':
             if ( sharpness >= 100) {
                 sharpness = 0;
             } else {
@@ -1461,7 +1519,6 @@ int functional_menu() {
             break;
 
         case 'c':
-        case 'C':
             if ( contrast >= 100) {
                 contrast = -100;
             } else {
@@ -1472,7 +1529,6 @@ int functional_menu() {
                 camera->setParameters(params.flatten());
             break;
 
-        case 'D':
         case 'd':
         {
             audioCodecIDX++;
@@ -1480,7 +1536,6 @@ int functional_menu() {
             break;
         }
 
-        case 'V':
         case 'v':
         {
             outputFormatIDX++;
@@ -1489,7 +1544,6 @@ int functional_menu() {
         }
 
         case 'z':
-        case 'Z':
             zoomIDX++;
             zoomIDX %= ARRAY_SIZE(zoom);
             params.set(KEY_ZOOM, zoom[zoomIDX].idx);
@@ -1500,7 +1554,6 @@ int functional_menu() {
             break;
 
         case 'j':
-        case 'J':
             exposure_mode++;
             exposure_mode %= ARRAY_SIZE(exposure);
             params.set(KEY_EXPOSURE, exposure_mode);
@@ -1511,8 +1564,6 @@ int functional_menu() {
             break;
 
         case 'b':
-        case 'B':
-
             if ( brightness >= 200) {
                 brightness = 0;
             } else {
@@ -1527,7 +1578,6 @@ int functional_menu() {
             break;
 
         case 's':
-        case 'S':
 
             if ( saturation >= 100) {
                 saturation = -100;
@@ -1543,7 +1593,6 @@ int functional_menu() {
             break;
 
         case 'e':
-        case 'E':
             effects_mode++;
             effects_mode %= ARRAY_SIZE(effects);
             params.set(params.KEY_EFFECT, effects[effects_mode]);
@@ -1554,7 +1603,6 @@ int functional_menu() {
             break;
 
         case 'r':
-        case 'R':
             frameRateIDX += 1;
             frameRateIDX %= ARRAY_SIZE(frameRate);
             params.setPreviewFrameRate(frameRate[frameRateIDX].fps);
@@ -1569,7 +1617,6 @@ int functional_menu() {
 
             break;
 
-        case 'X':
         case 'x':
             antibanding_mode++;
             antibanding_mode %= ARRAY_SIZE(antibanding);
@@ -1581,7 +1628,6 @@ int functional_menu() {
             break;
 
         case 'g':
-        case 'G':
             focus_mode++;
             focus_mode %= ARRAY_SIZE(focus);
             params.set(params.KEY_FOCUS_MODE, focus[focus_mode]);
@@ -1591,7 +1637,6 @@ int functional_menu() {
 
             break;
 
-        case 'F':
         case 'f':
             gettimeofday(&autofocus_start, 0);
 
@@ -1600,7 +1645,6 @@ int functional_menu() {
 
             break;
 
-        case 'P':
         case 'p':
 
             camera->setParameters(params.flatten());
@@ -1627,7 +1671,6 @@ int functional_menu() {
 
             break;
 
-        case 'Q':
         case 'q':
 
             stopPreview();
@@ -1725,7 +1768,6 @@ char *load_script(char *config) {
     return script;
 }
 
-
 char * get_cycle_cmd(const char *aSrc) {
     unsigned ind = 0;
     char *cycle_cmd = new char[256];
@@ -1746,6 +1788,7 @@ int execute_functional_script(char *script) {
     int cycleCounter = 1;
     int tLen = 0;
     unsigned int iteration = 0;
+    status_t ret = NO_ERROR;
 
     LOG_FUNCTION_NAME
 
@@ -1761,7 +1804,14 @@ int execute_functional_script(char *script) {
         switch (id) {
             case '[':
                 if ( hardwareActive )
-                    camera->startPreview();
+                    {
+                    printf("starting camera preview..");
+                    status_t ret = camera->startPreview();
+                    if(ret !=NO_ERROR)
+                        {
+                        printf("startPreview failed %d..", ret);
+                        }
+                    }
                 break;
             case '+': {
                 cycleCounter = atoi(cmd + 1);
@@ -1848,6 +1898,7 @@ int execute_functional_script(char *script) {
 
             case '4':
             {
+                printf("Setting resolution...");
                 int width, height;
                 for(i = 0; i < ARRAY_SIZE(previewSize); i++)
                 {
@@ -1868,6 +1919,8 @@ int execute_functional_script(char *script) {
                     res = strtok(NULL, "x");
                     height = atoi(res);
                 }
+
+                printf("Resolution: %d x %d", width, height);
 
                 params.setPreviewSize(width, height);
                 reSizePreview = true;
@@ -2009,7 +2062,6 @@ int execute_functional_script(char *script) {
                     camera->startRecording();
                 break;
 
-            case 'T':
             case 't':
                 params.setPreviewFormat((cmd + 1));
                 if ( hardwareActive )
@@ -2017,7 +2069,6 @@ int execute_functional_script(char *script) {
                 break;
 
             case 'o':
-            case 'O':
                 jpegQuality = atoi(cmd + 1);
                 params.set(CameraParameters::KEY_JPEG_QUALITY, jpegQuality);
 
@@ -2035,7 +2086,6 @@ int execute_functional_script(char *script) {
 
 
             case 'k':
-            case 'K':
                 params.set(KEY_IPP, atoi(cmd + 1));
                 if ( hardwareActive )
                     camera->setParameters(params.flatten());
@@ -2043,7 +2093,6 @@ int execute_functional_script(char *script) {
                 break;
 
             case 'u':
-            case 'U':
                 params.set(KEY_MODE, atoi(cmd + 1));
                 if ( hardwareActive )
                     camera->setParameters(params.flatten());
@@ -2061,7 +2110,6 @@ int execute_functional_script(char *script) {
 
 
             case 'w':
-            case 'W':
                 params.set(params.KEY_SCENE_MODE, (cmd + 1));
 
                 if ( hardwareActive )
@@ -2069,8 +2117,32 @@ int execute_functional_script(char *script) {
 
                 break;
 
+            case 'B' :
+                params.set(KEY_VNF, (cmd + 1));
+
+                if ( hardwareActive )
+                    camera->setParameters(params.flatten());
+
+
+            case 'C' :
+                params.set(KEY_VSTAB, (cmd + 1));
+
+                if ( hardwareActive )
+                    camera->setParameters(params.flatten());
+                break;
+
+            case 'D':
+                if ( hardwareActive )
+                    camera->stopRecording();
+                break;
+
+            case 'E':
+                if(hardwareActive)
+                    params.unflatten(camera->getParameters());
+                printSupportedParams();
+                break;
+
             case 'y':
-            case 'Y':
                 caf_mode = atoi(cmd + 1);
                 params.set(KEY_CAF, caf_mode);
 
@@ -2080,7 +2152,6 @@ int execute_functional_script(char *script) {
                 break;
 
             case 'i':
-            case 'I':
                 iso_mode = atoi(cmd + 1);
                 params.set(KEY_ISO, iso_mode);
 
@@ -2090,7 +2161,6 @@ int execute_functional_script(char *script) {
                 break;
 
             case 'h':
-            case 'H':
                 sharpness = atoi(cmd + 1);
                 params.set(KEY_SHARPNESS, sharpness);
 
@@ -2115,7 +2185,6 @@ int execute_functional_script(char *script) {
                 break;
 
             case 'c':
-            case 'C':
                 contrast = atoi(cmd + 1);
                 params.set(KEY_CONTRAST, contrast);
 
@@ -2126,7 +2195,6 @@ int execute_functional_script(char *script) {
                 break;
 
             case 'z':
-            case 'Z':
                 params.set(KEY_ZOOM, atoi(cmd + 1) - 1);
 
                 if ( hardwareActive )
@@ -2135,7 +2203,6 @@ int execute_functional_script(char *script) {
                 break;
 
             case 'j':
-            case 'J':
                 params.set(KEY_EXPOSURE, atoi(cmd + 1));
                 if ( hardwareActive )
                     camera->setParameters(params.flatten());
@@ -2143,7 +2210,6 @@ int execute_functional_script(char *script) {
                 break;
 
             case 'b':
-            case 'B':
                 brightness = atoi(cmd + 1);
                 params.set(KEY_BRIGHTNESS, brightness);
 
@@ -2153,7 +2219,6 @@ int execute_functional_script(char *script) {
                 break;
 
             case 's':
-            case 'S':
                 saturation = atoi(cmd + 1);
                 params.set(KEY_SATURATION, saturation);
 
@@ -2163,7 +2228,6 @@ int execute_functional_script(char *script) {
                 break;
 
             case 'e':
-            case 'E':
                 params.set(params.KEY_EFFECT, (cmd + 1));
 
                 if ( hardwareActive )
@@ -2172,7 +2236,6 @@ int execute_functional_script(char *script) {
                 break;
 
             case 'r':
-            case 'R':
                 params.setPreviewFrameRate(atoi(cmd + 1));
 
                 if ( hardwareActive && previewRunning ) {
@@ -2185,7 +2248,6 @@ int execute_functional_script(char *script) {
 
                 break;
 
-            case 'X':
             case 'x':
                 params.set(params.KEY_ANTIBANDING, (cmd + 1));
 
@@ -2195,7 +2257,6 @@ int execute_functional_script(char *script) {
                 break;
 
             case 'g':
-            case 'G':
                 params.set(params.KEY_FOCUS_MODE, (cmd + 1));
 
                 if ( hardwareActive )
@@ -2203,7 +2264,6 @@ int execute_functional_script(char *script) {
 
                 break;
 
-            case 'F':
             case 'f':
                 gettimeofday(&autofocus_start, 0);
 
@@ -2212,24 +2272,23 @@ int execute_functional_script(char *script) {
 
                 break;
 
-            case 'P':
             case 'p':
                 camera->setParameters(params.flatten());
                 gettimeofday(&picture_start, 0);
 
                 if ( hardwareActive )
-                    camera->takePicture();
+                    ret = camera->takePicture();
+
+                if(ret!=NO_ERROR)
+                    printf("Error returned while taking a picture", ret);
 
                 break;
 
-            case 'D':
             case 'd':
                 dly = atoi(cmd + 1);
-                dly *= 1000000;
-                usleep(dly);
+                sleep(dly);
                 break;
 
-            case 'Q':
             case 'q':
                 stopPreview();
 
@@ -2251,7 +2310,6 @@ int execute_functional_script(char *script) {
                 iteration++;
                 break;
 
-            case 'M':
             case 'm':
             {
                 params.set(KEY_METERING_MODE, (cmd + 1));
@@ -2262,7 +2320,6 @@ int execute_functional_script(char *script) {
                 break;
             }
 
-            case 'N':
             case 'n':
             {
                 nullOverlay = true;
