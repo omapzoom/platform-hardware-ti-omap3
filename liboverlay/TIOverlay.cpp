@@ -1174,8 +1174,8 @@ int overlay_data_context_t::overlay_initialize(struct overlay_data_device_t *dev
     ctx->omap_overlay->qd_buf_count = 0;
 
     ctx->omap_overlay->mapping_data = new mapping_data_t;
-    ctx->omap_overlay->buffers     = new void* [ctx->omap_overlay->num_buffers];
-    ctx->omap_overlay->buffers_len = new size_t[ctx->omap_overlay->num_buffers];
+    ctx->omap_overlay->buffers     = new void* [NUM_OVERLAY_BUFFERS_MAX];
+    ctx->omap_overlay->buffers_len = new size_t[NUM_OVERLAY_BUFFERS_MAX];
     if (!ctx->omap_overlay->buffers || !ctx->omap_overlay->buffers_len || !ctx->omap_overlay->mapping_data) {
             LOGE("Failed alloc'ing buffer arrays\n");
             overlay_control_context_t::close_shared_overlayobj(ctx->omap_overlay);
@@ -1364,7 +1364,7 @@ int overlay_data_context_t::overlay_data_setParameter(struct overlay_data_device
             LOGE("InValid number of optimal quebufffers requested[%d]", value);
             return -1;
         }
-        ctx->omap_overlay->optimalQBufCnt = MIN(value, NUM_OVERLAY_BUFFERS_REQUESTED);
+        ctx->omap_overlay->optimalQBufCnt = MIN(value, NUM_OVERLAY_BUFFERS_MAX);
 
         break;
     case OVERLAY_NUM_BUFFERS:
@@ -1372,7 +1372,7 @@ int overlay_data_context_t::overlay_data_setParameter(struct overlay_data_device
             LOGE("InValid number of Overlay bufffers requested[%d]", value);
             return -1;
         }
-        ctx->omap_overlay->num_buffers = MIN(value, NUM_OVERLAY_BUFFERS_REQUESTED);
+        ctx->omap_overlay->num_buffers = MIN(value, NUM_OVERLAY_BUFFERS_MAX);
         ctx->omap_overlay->attributes_changed = 1;
         break;
     }
