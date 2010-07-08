@@ -62,8 +62,8 @@ class OverlayTest : public Test
 {
 public:
     sp<ProcessState> mProc;
-    void* mBuffers1[NUM_OVERLAY_BUFFERS_REQUESTED];
-    void* mBuffers2[NUM_OVERLAY_BUFFERS_REQUESTED];
+    void* mBuffers1[NUM_OVERLAY_BUFFERS_MAX];
+    void* mBuffers2[NUM_OVERLAY_BUFFERS_MAX];
     int   mNumBuffers;
 
     //surface flinger client data structures
@@ -252,9 +252,12 @@ void OverlayTest::testOverlay(char* img1, uint32_t w1, uint32_t h1, uint8_t fmt1
     }
     mOverlay1->resizeInput(w1/2, h1/2);
 
-    mOverlay1->setParameter(OVERLAY_NUM_BUFFERS, 30);
+    mOverlay1->setParameter(OVERLAY_NUM_BUFFERS, 40);
     mOverlay1->resizeInput(w1, h1);
     }
+
+    mOverlay1->setParameter(OVERLAY_NUM_BUFFERS, 10);
+    mOverlay1->resizeInput(w1, h1);
 
     if (img2 != NULL)
     {
@@ -869,7 +872,14 @@ void OverlayTest::testErrorScenarios()
     RET_CHECK_EQ(ret, 0 , __LINE__);
 
     ret = mOverlay1->getBufferCount();
-    RET_CHECK_EQ(ret, NUM_OVERLAY_BUFFERS_REQUESTED, __LINE__);
+    RET_CHECK_EQ(ret, NUM_OVERLAY_BUFFERS_MAX, __LINE__);
+
+    ret = mOverlay1->setParameter(OVERLAY_NUM_BUFFERS, 10);
+    RET_CHECK_EQ(ret, 0 , __LINE__);
+
+    ret = mOverlay1->getBufferCount();
+    int buffercnt = (ret < NUM_OVERLAY_BUFFERS_MAX)? ret : NUM_OVERLAY_BUFFERS_MAX;
+    RET_CHECK_EQ(ret, buffercnt, __LINE__);
 
     ret = mOverlay1->resizeInput(200, 200);
     RET_CHECK_EQ(ret, 0, __LINE__);
@@ -965,7 +975,7 @@ void OverlayTest::testErrorScenarios()
     //get buffer addresses beyond the max buffer cnt
     int numBuffers1 = mOverlay1->getBufferCount();
     mapping_data_t* data1;
-    void* mBuffers1[NUM_OVERLAY_BUFFERS_REQUESTED*2];
+    void* mBuffers1[NUM_OVERLAY_BUFFERS_MAX*2];
 
     for (int i1 = 0; i1 < numBuffers1*2; i1++) {
         data1 = (mapping_data_t *)mOverlay1->getBufferAddress((void*)i1);
