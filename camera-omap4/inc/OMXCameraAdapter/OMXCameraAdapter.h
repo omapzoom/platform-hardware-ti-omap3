@@ -390,6 +390,8 @@ private:
     //GBCE
     status_t setGBCE(OMXCameraAdapter::BrightnessMode mode);
 
+    status_t printComponentVersion(OMX_HANDLETYPE handle);
+
     //Touch AF
     status_t parseTouchFocusPosition(const char *pos, unsigned int &posX, unsigned int &posY);
     status_t setTouchFocus(unsigned int posX, unsigned int posY, size_t width, size_t height);

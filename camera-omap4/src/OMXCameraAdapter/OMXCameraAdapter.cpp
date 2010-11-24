@@ -215,10 +215,9 @@ status_t OMXCameraAdapter::initialize(int sensor_index)
              GOTO_EXIT_IF((eError!=OMX_ErrorNone), eError);
 
              //Wait for the port enable event to occur
-         eventSem.Wait();
+             eventSem.Wait();
 
              CAMHAL_LOGDA("-Port enable event arrived");
-
             }
         else
             {
@@ -248,6 +247,9 @@ status_t OMXCameraAdapter::initialize(int sensor_index)
         {
         CAMHAL_LOGEB("Sensor %d selected successfully", sensor_index);
         }
+
+    printComponentVersion(mCameraAdapterParameters.mHandleComp);
+
 
     mSensorIndex = sensor_index;
     mBracketingEnabled = false;
@@ -4224,6 +4226,98 @@ status_t OMXCameraAdapter::setNSF(OMXCameraAdapter::IPPMode mode)
     return ret;
 }
 
+status_t OMXCameraAdapter::printComponentVersion(OMX_HANDLETYPE handle)
+{
+    status_t ret = NO_ERROR;
+    OMX_ERRORTYPE eError = OMX_ErrorNone;
+    OMX_VERSIONTYPE compVersion;
+    OMX_VERSIONTYPE specVersion;
+    char compName[OMX_MAX_STRINGNAME_SIZE];
+    OMX_UUIDTYPE compUUID;
+    char *currentUUID;
+    size_t offset;
+
+    LOG_FUNCTION_NAME
+
+    if ( NULL == handle )
+        {
+        CAMHAL_LOGEB("Invalid OMX Handle =0x%x",  ( unsigned int ) handle);
+        ret = -EINVAL;
+        }
+
+    if ( NO_ERROR == ret )
+        {
+        eError = OMX_GetComponentVersion(handle,
+                                      compName,
+                                      &compVersion,
+                                      &specVersion,
+                                      &compUUID
+                                    );
+        if ( OMX_ErrorNone != eError )
+            {
+            CAMHAL_LOGEB("OMX_GetComponentVersion returned 0x%x", eError);
+            ret = -1;
+            }
+        }
+
+    if ( NO_ERROR == ret )
+        {
+        CAMHAL_LOGDB("OMX Component name: [%s]", compName);
+        CAMHAL_LOGDB("OMX Component version: [%u]", ( unsigned int ) compVersion.nVersion);
+        CAMHAL_LOGDB("Spec version: [%u]", ( unsigned int ) specVersion.nVersion);
+        CAMHAL_LOGDB("Git Commit ID: [%s]", compUUID);
+        currentUUID = ( char * ) compUUID;
+        }
+
+    if ( NULL != compUUID )
+        {
+        offset = strlen( ( const char * ) compUUID) + 1;
+        if ( offset < OMX_MAX_STRINGNAME_SIZE )
+            {
+            currentUUID += offset;
+            CAMHAL_LOGDB("Git Branch: [%s]", currentUUID);
+            }
+        else
+            {
+            ret = -1;
+            }
+    }
+
+    if ( NO_ERROR == ret )
+        {
+        offset += strlen( ( const char * ) compUUID) + 1;
+
+        if ( offset < OMX_MAX_STRINGNAME_SIZE )
+            {
+            currentUUID += offset;
+            CAMHAL_LOGDB("Build date and time: [%s]", currentUUID);
+            }
+        else
+            {
+            ret = -1;
+            }
+        }
+
+    if ( NO_ERROR == ret )
+        {
+        offset += strlen( ( const char * ) compUUID) + 1;
+
+        if ( offset < OMX_MAX_STRINGNAME_SIZE )
+            {
+            currentUUID += offset;
+            CAMHAL_LOGDB("Build description: [%s]", currentUUID);
+            }
+        else
+            {
+            ret = -1;
+            }
+        }
+
+    LOG_FUNCTION_NAME_EXIT
+
+    return ret;
+}
+
 status_t OMXCameraAdapter::setGBCE(OMXCameraAdapter::BrightnessMode mode)
 {
     status_t ret = NO_ERROR;
@@ -4240,7 +4334,6 @@ status_t OMXCameraAdapter::setGBCE(OMXCameraAdapter::BrightnessMode mode)
 
     if ( NO_ERROR == ret )
         {
-
         OMX_INIT_STRUCT_PTR (&bControl,
                                                OMX_TI_CONFIG_LOCAL_AND_GLOBAL_BRIGHTNESSCONTRASTTYPE);
 
