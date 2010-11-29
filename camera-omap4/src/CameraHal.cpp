@@ -585,6 +585,54 @@ status_t CameraHal::setParameters(const CameraParameters &params)
         mParameters.set(CameraParameters::KEY_JPEG_THUMBNAIL_QUALITY, valstr);
         }
 
+    if( (params.get(CameraParameters::KEY_GPS_LATITUDE) != NULL ) )
+        {
+        CAMHAL_LOGDB("GPS latitude set %s", params.get(CameraParameters::KEY_GPS_LATITUDE));
+        mParameters.set(CameraParameters::KEY_GPS_LATITUDE, params.get(CameraParameters::KEY_GPS_LATITUDE));
+        }
+
+    if( (params.get(CameraParameters::KEY_GPS_LONGITUDE) != NULL ) )
+        {
+        CAMHAL_LOGDB("GPS longitude set %s", params.get(CameraParameters::KEY_GPS_LONGITUDE));
+        mParameters.set(CameraParameters::KEY_GPS_LONGITUDE, params.get(CameraParameters::KEY_GPS_LONGITUDE));
+        }
+
+    if( (params.get(CameraParameters::KEY_GPS_ALTITUDE) != NULL ) )
+        {
+        CAMHAL_LOGDB("GPS altitude set %s", params.get(CameraParameters::KEY_GPS_ALTITUDE));
+        mParameters.set(CameraParameters::KEY_GPS_ALTITUDE, params.get(CameraParameters::KEY_GPS_ALTITUDE));
+        }
+
+    if( (params.get(CameraParameters::KEY_GPS_TIMESTAMP) != NULL ) )
+        {
+        CAMHAL_LOGDB("GPS timestamp set %s", params.get(CameraParameters::KEY_GPS_TIMESTAMP));
+        mParameters.set(CameraParameters::KEY_GPS_TIMESTAMP, params.get(CameraParameters::KEY_GPS_TIMESTAMP));
+        }
+
+    if( (params.get(CameraParameters::KEY_GPS_PROCESSING_METHOD) != NULL ) )
+        {
+        CAMHAL_LOGDB("GPS processing method set %s", params.get(CameraParameters::KEY_GPS_PROCESSING_METHOD));
+        mParameters.set(CameraParameters::KEY_GPS_PROCESSING_METHOD, params.get(CameraParameters::KEY_GPS_PROCESSING_METHOD));
+        }
+
+    if( (params.get(TICameraParameters::KEY_GPS_ALTITUDE_REF) != NULL ) )
+        {
+        CAMHAL_LOGDB("GPS altitude ref set %s", params.get(TICameraParameters::KEY_GPS_ALTITUDE_REF));
+        mParameters.set(TICameraParameters::KEY_GPS_ALTITUDE_REF, params.get(TICameraParameters::KEY_GPS_ALTITUDE_REF));
+        }
+
+    if( (params.get(TICameraParameters::KEY_GPS_MAPDATUM ) != NULL ) )
+        {
+        CAMHAL_LOGDB("GPS MAPDATUM set %s", params.get(TICameraParameters::KEY_GPS_MAPDATUM));
+        mParameters.set(TICameraParameters::KEY_GPS_MAPDATUM, params.get(TICameraParameters::KEY_GPS_MAPDATUM));
+        }
+
+    if( (params.get(TICameraParameters::KEY_GPS_VERSION ) != NULL ) )
+        {
+        CAMHAL_LOGDB("GPS MAPDATUM set %s", params.get(TICameraParameters::KEY_GPS_VERSION));
+        mParameters.set(TICameraParameters::KEY_GPS_VERSION, params.get(TICameraParameters::KEY_GPS_VERSION));
+        }
+
     if( (params.get(TICameraParameters::KEY_EXP_BRACKETING_RANGE ) != NULL ) )
         {
         CAMHAL_LOGDB("Exposure Bracketing set %s", params.get(TICameraParameters::KEY_EXP_BRACKETING_RANGE));

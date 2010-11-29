@@ -63,6 +63,16 @@ namespace android {
 #define ZOOM_STAGES 61
 #define FACE_DETECTION_BUFFER_SIZE  0x1000
 
+#define GPS_DATESTAMP_SIZE      11
+#define GPS_REF_SIZE                    2
+#define GPS_MAPDATUM_SIZE       100
+#define GPS_PROCESSING_SIZE     100
+#define GPS_VERSION_SIZE            4
+#define GPS_NORTH_REF                "N"
+#define GPS_SOUTH_REF                "S"
+#define GPS_EAST_REF                   "E"
+#define GPS_WEST_REF                  "W"
+
 /* Default portstartnumber of Camera component */
 #define OMX_CAMERA_DEFAULT_START_PORT_NUM 0
 
@@ -197,6 +207,28 @@ public:
         BRIGHTNESS_AUTO,
         };
 
+    class GPSData
+    {
+        public:
+                int mLongDeg, mLongMin, mLongSec;
+                char mLongRef[GPS_REF_SIZE];
+                bool mLongValid;
+                int mLatDeg, mLatMin, mLatSec;
+                char mLatRef[GPS_REF_SIZE];
+                bool mLatValid;
+                int mAltitude;
+                char mAltitudeRef[GPS_REF_SIZE];
+                bool mAltitudeValid;
+                char mMapDatum[GPS_MAPDATUM_SIZE];
+                bool mMapDatumValid;
+                char mVersionId[GPS_VERSION_SIZE];
+                bool mVersionIdValid;
+                char mProcMethod[GPS_PROCESSING_SIZE];
+                bool mProcMethodValid;
+                char mDatestamp[GPS_DATESTAMP_SIZE];
+                bool mDatestampValid;
+    };
+
     ///Parameters specific to any port of the OMX Camera component
     class OMXCameraPortParameters
     {
@@ -317,6 +349,10 @@ private:
     status_t setPictureRotation(unsigned int degree);
     status_t setImageQuality(unsigned int quality);
     status_t setThumbnailParams(unsigned int width, unsigned int height, unsigned int quality);
+
+    //Geo-tagging
+    status_t convertGPSCoord(double coord, int *deg, int *min, int *sec);
+    status_t setupEXIF();
 
     //Focus functionality
     status_t doAutoFocus();
@@ -448,6 +484,9 @@ private:
     bool mFaceDetectionRunning;
     //Buffer for storing face detection results
     char mFaceDectionResult [FACE_DETECTION_BUFFER_SIZE];
+
+    //Geo-tagging
+    GPSData mGPSData;
 
     //Image post-processing
     IPPMode mIPP;

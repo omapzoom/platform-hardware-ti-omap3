@@ -88,6 +88,21 @@ static const char KEY_AUTOCONVERGENCE[];
 static const char KEY_AUTOCONVERGENCE_MODE[];
 static const char KEY_MANUALCONVERGENCE_VALUES[];
 
+
+//  TI extensions for Manual Gain and Manual Exposure
+static const char KEY_MANUAL_EXPOSURE_LEFT[];
+static const char KEY_MANUAL_EXPOSURE_RIGHT[];
+static const char KEY_MANUAL_EXPOSURE_MODES[];
+static const char KEY_MANUAL_GAIN_EV_RIGHT[];
+static const char KEY_MANUAL_GAIN_EV_LEFT[];
+static const char KEY_MANUAL_GAIN_ISO_RIGHT[];
+static const char KEY_MANUAL_GAIN_ISO_LEFT[];
+static const char KEY_MANUAL_GAIN_MODES[];
+
+static const char  KEY_GPS_ALTITUDE_REF[];
+static const char  KEY_GPS_MAPDATUM[];
+static const char  KEY_GPS_VERSION[];
+
 //TI extensions for enabling/disabling shutter sound
 static const char SHUTTER_ENABLE[];
 static const char SHUTTER_DISABLE[];
