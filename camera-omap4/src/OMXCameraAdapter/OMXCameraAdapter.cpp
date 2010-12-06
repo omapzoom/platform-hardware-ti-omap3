@@ -3078,7 +3078,7 @@ status_t OMXCameraAdapter::stopPreview()
         goto EXIT;
         }
 
-    ret = OMX_SendCommand (mCameraAdapterParameters.mHandleComp,
+    eError = OMX_SendCommand (mCameraAdapterParameters.mHandleComp,
                                 OMX_CommandStateSet, OMX_StateIdle, NULL);
     if(eError!=OMX_ErrorNone)
         {
@@ -5779,7 +5779,14 @@ OMX_ERRORTYPE OMXCameraAdapter::OMXCameraAdapterEventHandler(OMX_IN OMX_HANDLETY
         case OMX_EventError:
             CAMHAL_LOGDB("OMX interface failed to execute OMX command %d", (int)nData1);
             CAMHAL_LOGDA("See OMX_INDEXTYPE for reference");
-        break;
+            if ( NULL != mErrorNotifier && OMX_ErrorHardware == nData1 && mComponentState != OMX_StateInvalid)
+              {
+                LOGD("***Got MMU FAULT***\n");
+                mComponentState = OMX_StateInvalid;
+                ///Report Error to App
+                mErrorNotifier->errorNotify((int)nData1);
+              }
+            break;
 
         case OMX_EventMark:
         break;
