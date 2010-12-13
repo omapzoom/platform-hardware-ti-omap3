@@ -285,6 +285,19 @@ status_t OMXCameraAdapter::initialize(int sensor_index)
     mGPSData.mProcMethodValid = false;
     mGPSData.mVersionIdValid = false;
 
+    //Remove any unhandled events
+    if ( !mEventSignalQ.isEmpty() )
+        {
+        for (unsigned int i = 0 ; i < mEventSignalQ.size() ; i++ )
+            {
+            Message *msg = mEventSignalQ.itemAt(i);
+            if ( NULL != msg )
+                {
+                free(msg);
+                }
+            }
+        }
+
     //Setting this flag will that the first setParameter call will apply all 3A settings
     //and will not conditionally apply based on current values.
     mFirstTimeInit = true;
@@ -5832,58 +5845,35 @@ OMX_ERRORTYPE OMXCameraAdapter::SignalEvent(OMX_IN OMX_HANDLETYPE hComponent,
                                           OMX_IN OMX_U32 nData2,
                                           OMX_IN OMX_PTR pEventData)
 {
-    int64_t startId, nextId;
     Mutex::Autolock lock(mEventLock);
+    Message *msg;
 
     LOG_FUNCTION_NAME
 
     if ( !mEventSignalQ.isEmpty() )
         {
         CAMHAL_LOGDA("Event queue not empty");
-        Message msg;
-        mEventSignalQ.get(&msg);
 
-        startId = msg.id;
-
-        //Iterate through the FIFO until we either find our event
-        //or reach the end of the queue
-        do
+        for ( unsigned int i = 0 ; i < mEventSignalQ.size() ; i++ )
             {
-
-            CAMHAL_LOGDB("msg.id = %d msg.command = %d, msg.arg1 = %d, msg.arg2 = %d, msg.arg3 = %d", ( int ) msg.id,
-                                                                               ( int ) msg.command,
-                                                                               ( int ) msg.arg1,
-                                                                               ( int ) msg.arg2,
-                                                                               ( int ) msg.arg3 );
-
-            if( ( msg.command != 0 || msg.command == ( unsigned int ) ( eEvent ) )
-                && ( !msg.arg1 || ( OMX_U32 ) msg.arg1 == nData1 )
-                && ( !msg.arg2 || ( OMX_U32 ) msg.arg2 == nData2 )
-                && msg.arg3)
+            msg = mEventSignalQ.itemAt(i);
+            if ( NULL != msg )
                 {
-                Semaphore *sem  = (Semaphore*) msg.arg3;
-                CAMHAL_LOGDA("Event matched, signalling sem");
-                //Signal the semaphore provided
-                sem->Signal();
-                break;
+                if( ( msg->command != 0 || msg->command == ( unsigned int ) ( eEvent ) )
+                    && ( !msg->arg1 || ( OMX_U32 ) msg->arg1 == nData1 )
+                    && ( !msg->arg2 || ( OMX_U32 ) msg->arg2 == nData2 )
+                    && msg->arg3)
+                    {
+                    Semaphore *sem  = (Semaphore*) msg->arg3;
+                    CAMHAL_LOGDA("Event matched, signalling sem");
+                    mEventSignalQ.removeAt(i);
+                    //Signal the semaphore provided
+                    sem->Signal();
+                    free(msg);
+                    break;
+                    }
                 }
-            else if ( mEventSignalQ.isEmpty() )
-                {
-                //Put the message back in the queue
-                CAMHAL_LOGDA("Event didnt match, putting the message back in Q");
-                mEventSignalQ.put(&msg);
-                break;
-                }
-
-            CAMHAL_LOGDA("Event didnt match, putting the message back in Q");
-            mEventSignalQ.put(&msg);
-
-            //Get the next one
-            mEventSignalQ.get(&msg);
-            nextId = msg.id;
-
-            } while ( startId != nextId );
-
+            }
         }
     else
         {
@@ -5902,23 +5892,31 @@ status_t OMXCameraAdapter::RegisterForEvent(OMX_IN OMX_HANDLETYPE hComponent,
                                           OMX_IN Semaphore &semaphore,
                                           OMX_IN OMX_U32 timeout)
 {
-    static int64_t id = 0;
+    status_t ret = NO_ERROR;
+    ssize_t res;
+    Mutex::Autolock lock(mEventLock);
 
     LOG_FUNCTION_NAME
 
-    Message msg;
-    msg.command = (unsigned int)eEvent;
-    msg.arg1 = (void*)nData1;
-    msg.arg2 = (void*)nData2;
-    msg.arg3 = (void*)&semaphore;
-    msg.arg4 = (void*)hComponent;
-    msg.id = id;
-
-    id++;
+    Message * msg = ( struct Message * ) malloc(sizeof(struct Message));
+    if ( NULL != msg )
+        {
+        msg->command = ( unsigned int ) eEvent;
+        msg->arg1 = ( void * ) nData1;
+        msg->arg2 = ( void * ) nData2;
+        msg->arg3 = ( void * ) &semaphore;
+        msg->arg4 =  ( void * ) hComponent;
+        res = mEventSignalQ.add(msg);
+        if ( NO_MEMORY == res )
+            {
+            CAMHAL_LOGEA("No ressources for inserting OMX events");
+            ret = -ENOMEM;
+            }
+        }
 
     LOG_FUNCTION_NAME_EXIT
 
-    return mEventSignalQ.put(&msg);
+    return ret;
 }
 
 /*========================================================*/

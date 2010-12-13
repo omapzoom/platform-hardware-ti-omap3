@@ -565,7 +565,7 @@ private:
     bool mFirstTimeInit;
 
     ///Semaphores used internally
-    MessageQueue mEventSignalQ;
+    Vector<struct Message *> mEventSignalQ;
     Mutex mLock;
     bool mPreviewing;
     bool mCapturing;
