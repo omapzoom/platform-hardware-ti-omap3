@@ -741,7 +741,7 @@ LOGV("%s", __FUNCTION__);
     }
 
 #ifdef AUDIO_MODEM_TI
-    audioModem->voiceCallControls(devices, mode, &control);
+    audioModem->voiceCallControls(devices, mode);
 #endif
 }
 
@@ -775,8 +775,7 @@ static status_t s_init(alsa_device_t *module, ALSAHandleList &list)
     }
 
 #ifdef AUDIO_MODEM_TI
-    ALSAControl control("hw:00");
-    audioModem = new AudioModemAlsa(&control);
+    audioModem = new AudioModemAlsa();
 #endif
 
     return NO_ERROR;
@@ -886,8 +885,7 @@ static status_t s_route(alsa_handle_t *handle, uint32_t devices, int mode)
     }
 
 #ifdef AUDIO_MODEM_TI
-        ALSAControl control("hw:00");
-        status = audioModem->voiceCallControls(devices, mode, &control);
+        status = audioModem->voiceCallControls(devices, mode);
 #endif
 
     return status;
