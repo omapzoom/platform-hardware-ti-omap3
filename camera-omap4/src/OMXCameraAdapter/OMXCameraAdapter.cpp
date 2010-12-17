@@ -4016,8 +4016,7 @@ status_t OMXCameraAdapter::setPictureRotation(unsigned int degree)
         eError = OMX_SetConfig(mCameraAdapterParameters.mHandleComp, OMX_IndexConfigCommonRotate, &rotation);
         if ( OMX_ErrorNone != eError )
             {
-            CAMHAL_LOGEA("Error while configuring rotation");
-            ret = -1;
+            CAMHAL_LOGEB("Error while configuring rotation 0x%x", eError);
             }
         }
 
