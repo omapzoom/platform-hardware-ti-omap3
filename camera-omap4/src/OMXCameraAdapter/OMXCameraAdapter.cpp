@@ -4514,7 +4514,7 @@ status_t OMXCameraAdapter::doAutoFocus()
             setTouchFocus(mTouchFocusPosX, mTouchFocusPosY, mPreviewData->mWidth, mPreviewData->mHeight);
 
             //Do normal focus afterwards
-            focusControl.eFocusControl = OMX_IMAGE_FocusControlAutoLock;
+            focusControl.eFocusControl = ( OMX_IMAGE_FOCUSCONTROLTYPE ) OMX_IMAGE_FocusControlExtended;
 
             }
         else if ( FOCUS_FACE_PRIORITY == focusControl.eFocusControl )
@@ -4527,7 +4527,7 @@ status_t OMXCameraAdapter::doAutoFocus()
             setAlgoPriority(FACE_PRIORITY, FOCUS_ALGO, true);
 
             //Do normal focus afterwards
-            focusControl.eFocusControl = OMX_IMAGE_FocusControlAutoLock;
+            focusControl.eFocusControl = ( OMX_IMAGE_FOCUSCONTROLTYPE ) OMX_IMAGE_FocusControlExtended;
 
             }
         else
