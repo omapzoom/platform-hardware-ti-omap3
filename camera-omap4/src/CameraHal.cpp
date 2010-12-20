@@ -399,6 +399,18 @@ status_t CameraHal::setParameters(const CameraParameters &params)
 
     CAMHAL_LOGEB("FRAMERATE %d", framerate);
 
+    if( ( valstr = params.get(TICameraParameters::KEY_GBCE) ) != NULL )
+        {
+        CAMHAL_LOGDB("GBCE Value = %s", valstr);
+        mParameters.set(TICameraParameters::KEY_GBCE, valstr);
+        }
+
+    if( ( valstr = params.get(TICameraParameters::KEY_GLBCE) ) != NULL )
+        {
+        CAMHAL_LOGDB("GLBCE Value = %s", valstr);
+        mParameters.set(TICameraParameters::KEY_GLBCE, valstr);
+        }
+
     ///Update the current parameter set
     if( (valstr = params.get(TICameraParameters::KEY_AUTOCONVERGENCE)) != NULL)
         {

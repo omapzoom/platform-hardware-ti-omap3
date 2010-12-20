@@ -1073,6 +1073,48 @@ status_t OMXCameraAdapter::setParameters(const CameraParameters &params)
         setFaceDetection(false);
         }
 
+    if ( (valstr = params.get(TICameraParameters::KEY_GBCE)) != NULL )
+        {
+        if (strcmp(valstr, ( const char * ) TICameraParameters::GBCE_ENABLE ) == 0)
+            {
+            setGBCE(OMXCameraAdapter::BRIGHTNESS_ON);
+            }
+        else if (strcmp(valstr, ( const char * ) TICameraParameters::GBCE_DISABLE ) == 0)
+            {
+            setGBCE(OMXCameraAdapter::BRIGHTNESS_OFF);
+            }
+        else
+            {
+            setGBCE(OMXCameraAdapter::BRIGHTNESS_OFF);
+            }
+        }
+    else
+        {
+        //Disable GBCE by default
+        setGBCE(OMXCameraAdapter::BRIGHTNESS_OFF);
+        }
+
+    if ( ( valstr = params.get(TICameraParameters::KEY_GLBCE) ) != NULL )
+        {
+        if (strcmp(valstr, ( const char * ) TICameraParameters::GLBCE_ENABLE ) == 0)
+            {
+            setGLBCE(OMXCameraAdapter::BRIGHTNESS_ON);
+            }
+        else if (strcmp(valstr, ( const char * ) TICameraParameters::GLBCE_DISABLE ) == 0)
+            {
+            setGLBCE(OMXCameraAdapter::BRIGHTNESS_OFF);
+            }
+        else
+            {
+            setGLBCE(OMXCameraAdapter::BRIGHTNESS_OFF);
+            }
+        }
+    else
+        {
+        //Disable GLBCE by default
+        setGLBCE(OMXCameraAdapter::BRIGHTNESS_OFF);
+        }
+
     if ( (valstr = params.get(TICameraParameters::KEY_MEASUREMENT_ENABLE)) != NULL )
         {
         if (strcmp(valstr, (const char *) TICameraParameters::MEASUREMENT_ENABLE) == 0)
@@ -2354,22 +2396,6 @@ status_t OMXCameraAdapter::UseBuffersPreview(void* bufArr, int num)
         {
         CAMHAL_LOGEB("setFormat() failed %d", ret);
         LOG_FUNCTION_NAME_EXIT
-        return ret;
-        }
-
-    //Disable GBCE by default
-    ret = setGBCE(OMXCameraAdapter::BRIGHTNESS_OFF);
-    if ( NO_ERROR != ret)
-        {
-        CAMHAL_LOGEB("Error configuring GBCE %x", ret);
-        return ret;
-        }
-
-    //Disable GLBCE by default
-    ret = setGLBCE(OMXCameraAdapter::BRIGHTNESS_OFF);
-    if ( NO_ERROR != ret)
-        {
-        CAMHAL_LOGEB("Error configuring GLBCE %x", ret);
         return ret;
         }
 
@@ -4212,11 +4238,10 @@ status_t OMXCameraAdapter::setGBCE(OMXCameraAdapter::BrightnessMode mode)
         if ( OMX_ErrorNone != eError )
             {
             CAMHAL_LOGEB("Error while setting GBCE 0x%x", eError);
-            ret = -1;
             }
         else
             {
-            CAMHAL_LOGDA("GBCE configured successfully");
+            CAMHAL_LOGDB("GBCE configured successfully 0x%x", mode);
             }
         }
 
@@ -4272,7 +4297,6 @@ status_t OMXCameraAdapter::setGLBCE(OMXCameraAdapter::BrightnessMode mode)
         if ( OMX_ErrorNone != eError )
             {
             CAMHAL_LOGEB("Error while configure GLBCE 0x%x", eError);
-            ret = -1;
             }
         else
             {
@@ -5791,7 +5815,7 @@ OMX_ERRORTYPE OMXCameraAdapter::OMXCameraAdapterEventHandler(OMX_IN OMX_HANDLETY
         case OMX_EventError:
             CAMHAL_LOGDB("OMX interface failed to execute OMX command %d", (int)nData1);
             CAMHAL_LOGDA("See OMX_INDEXTYPE for reference");
-            if ( NULL != mErrorNotifier && OMX_ErrorHardware == nData1 && mComponentState != OMX_StateInvalid)
+            if ( NULL != mErrorNotifier && ( ( OMX_U32 ) OMX_ErrorHardware == nData1 ) && mComponentState != OMX_StateInvalid)
               {
                 LOGD("***Got MMU FAULT***\n");
                 mComponentState = OMX_StateInvalid;
