@@ -5,8 +5,7 @@ include $(CLEAR_VARS)
 # UIM Application
 #
 
-LOCAL_C_INCLUDES:= uim.h \
-	external/bluetooth/bluez/
+LOCAL_C_INCLUDES:= uim.h
 
 LOCAL_SRC_FILES:= \
 	uim.c
