@@ -68,6 +68,16 @@ const char TICameraParameters::KEY_TEMP_BRACKETING_RANGE_NEG[] = "temporal-brack
 const char TICameraParameters::KEY_S3D_SUPPORTED[] = "s3d-supported";
 const char TICameraParameters::KEY_TOUCH_FOCUS_POS[] = "touch-focus";
 const char TICameraParameters::KEY_MEASUREMENT_ENABLE[] = "measurement";
+const char  TICameraParameters::KEY_GBCE[] = "gbce";
+const char  TICameraParameters::KEY_GLBCE[] = "glbce";
+
+//TI extensions for enabling/disabling GLBCE
+const char TICameraParameters::GLBCE_ENABLE[] = "enable";
+const char TICameraParameters::GLBCE_DISABLE[] = "disable";
+
+//TI extensions for enabling/disabling GBCE
+const char TICameraParameters::GBCE_ENABLE[] = "enable";
+const char TICameraParameters::GBCE_DISABLE[] = "disable";
 
 //TI extensions for enabling/disabling measurement
 const char TICameraParameters::MEASUREMENT_ENABLE[] = "enable";

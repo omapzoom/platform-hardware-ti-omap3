@@ -69,7 +69,8 @@ static const char  KEY_SHUTTER_ENABLE[];
 static const char  KEY_TOUCH_FOCUS_POS[];
 static const char  KEY_MEASUREMENT_ENABLE[];
 static const char  KEY_INITIAL_VALUES[];
-
+static const char  KEY_GBCE[];
+static const char  KEY_GLBCE[];
 
 //TI extensions for zoom
 static const char ZOOM_SUPPORTED[];
@@ -88,6 +89,13 @@ static const char KEY_AUTOCONVERGENCE[];
 static const char KEY_AUTOCONVERGENCE_MODE[];
 static const char KEY_MANUALCONVERGENCE_VALUES[];
 
+//TI extensions for enabling/disabling GLBCE
+static const char GLBCE_ENABLE[];
+static const char GLBCE_DISABLE[];
+
+//TI extensions for enabling/disabling GBCE
+static const char GBCE_ENABLE[];
+static const char GBCE_DISABLE[];
 
 //  TI extensions for Manual Gain and Manual Exposure
 static const char KEY_MANUAL_EXPOSURE_LEFT[];
