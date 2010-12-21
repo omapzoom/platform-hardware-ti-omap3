@@ -886,6 +886,8 @@ status_t OMXCameraAdapter::setParameters(const CameraParameters &params)
              ( mode == OMX_IMAGE_FocusControlAutoInfinity ) )
             {
             mPending3Asettings |= SetFocus;
+            mParameters3A.Focus = mode;
+            apply3Asettings(mParameters3A);
             }
         else if ( mParameters3A.Focus == OMX_IMAGE_FocusControlAuto )
             {
