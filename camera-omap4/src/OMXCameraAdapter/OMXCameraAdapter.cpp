@@ -1052,25 +1052,31 @@ status_t OMXCameraAdapter::setParameters(const CameraParameters &params)
 
     CAMHAL_LOGVB("Burst Frames set %d", mBurstFrames);
 
-    if ( (valstr = params.get(TICameraParameters::KEY_FACE_DETECTION_ENABLE)) != NULL )
+    // FD enabled ONLY for HQ/HS mode. In VIDEO_MODE
+    // this is causing regression when VSTAB is enabled
+    // SO disabling it for VIDEO_MODE as VIDEO_MODE dont need FD
+    if (mCapMode != OMXCameraAdapter::VIDEO_MODE)
         {
-        if (strcmp(valstr, (const char *) TICameraParameters::FACE_DETECTION_ENABLE) == 0)
+        if ( (valstr = params.get(TICameraParameters::KEY_FACE_DETECTION_ENABLE)) != NULL )
             {
-            setFaceDetection(true);
-            }
-        else if (strcmp(valstr, (const char *) TICameraParameters::FACE_DETECTION_DISABLE) == 0)
-            {
-            setFaceDetection(false);
+            if (strcmp(valstr, (const char *) TICameraParameters::FACE_DETECTION_ENABLE) == 0)
+                {
+                setFaceDetection(true);
+                }
+           else if (strcmp(valstr, (const char *) TICameraParameters::FACE_DETECTION_DISABLE) == 0)
+                {
+                setFaceDetection(false);
+                }
+           else
+                {
+                setFaceDetection(false);
+                }
             }
         else
             {
+            //Disable face detection by default
             setFaceDetection(false);
             }
-        }
-    else
-        {
-        //Disable face detection by default
-        setFaceDetection(false);
         }
 
     if ( (valstr = params.get(TICameraParameters::KEY_GBCE)) != NULL )
