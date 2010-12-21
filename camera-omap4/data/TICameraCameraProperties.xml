@@ -51,6 +51,8 @@
 <contrast>100</contrast>
 <saturation>100</saturation>
 <sharpness>100</sharpness>
+<vstab>0</vstab>
+<vstab-values>0,1</vstab-values>
 </CameraInstance>
 <CameraInstance>
 <camera-name>SecondaryCamera</camera-name>
@@ -102,6 +104,8 @@
 <contrast>100</contrast>
 <saturation>100</saturation>
 <sharpness>100</sharpness>
+<vstab>0</vstab>
+<vstab-values>0,1</vstab-values>
 </CameraInstance>
 <CameraInstance>
 <camera-name>DualCamera</camera-name>

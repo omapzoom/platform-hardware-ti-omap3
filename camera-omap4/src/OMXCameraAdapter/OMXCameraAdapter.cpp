@@ -2265,6 +2265,14 @@ status_t OMXCameraAdapter::UseBuffersPreview(void* bufArr, int num)
 
     LOG_FUNCTION_NAME
 
+    ///Flag to determine whether it is 3D camera or not
+    bool isS3d = false;
+    const char *valstr = NULL;
+    if ( (valstr = mParams.get(TICameraParameters::KEY_S3D_SUPPORTED)) != NULL) {
+        isS3d = (strcmp(valstr, "true") == 0);
+    }
+
+
     if(mComponentState!=OMX_StateLoaded)
         {
         CAMHAL_LOGEA("Calling UseBuffersPreview() when not in LOADED state");
@@ -2428,7 +2436,7 @@ status_t OMXCameraAdapter::UseBuffersPreview(void* bufArr, int num)
         return ret;
         }
 
-    if(mCapMode == OMXCameraAdapter::VIDEO_MODE || mCapMode == OMXCameraAdapter::HIGH_QUALITY)
+    if(mCapMode == OMXCameraAdapter::VIDEO_MODE || (isS3d && (mCapMode == OMXCameraAdapter::HIGH_QUALITY)))
         {
         ///Enable/Disable Video Noise Filter
         ret = enableVideoNoiseFilter(mVnfEnabled);
@@ -2438,6 +2446,24 @@ status_t OMXCameraAdapter::UseBuffersPreview(void* bufArr, int num)
             return ret;
             }
 
+        ///Enable/Disable Video Stabilization
+        ret = enableVideoStabilization(mVstabEnabled);
+        if ( NO_ERROR != ret)
+            {
+            CAMHAL_LOGEB("Error configuring VSTAB %x", ret);
+            return ret;
+            }
+        }
+    else
+        {
+        mVnfEnabled = false;
+        ret = enableVideoNoiseFilter(mVnfEnabled);
+        if ( NO_ERROR != ret)
+            {
+            CAMHAL_LOGEB("Error configuring VNF %x", ret);
+            return ret;
+            }
+        mVstabEnabled = false;
         ///Enable/Disable Video Stabilization
         ret = enableVideoStabilization(mVstabEnabled);
         if ( NO_ERROR != ret)
