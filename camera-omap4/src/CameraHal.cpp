@@ -1447,11 +1447,17 @@ void CameraHal::stopPreview()
         mAppCallbackNotifier->stopPreviewCallbacks();
         }
 
-    if(mBracketingRunning)
-        {
-        stopImageBracketing();
-        }
+    // stop bracketing if it is running
+    stopImageBracketing();
 
+    // since prerequisite for capturing is for camera system
+    // to be previewing...cancel all captures before stopping
+    // preview
+    if(mImageCaptureRunning){
+        mCameraAdapter->sendCommand(CameraAdapter::CAMERA_STOP_IMAGE_CAPTURE);
+        mImageCaptureRunning = false;
+        mTakePictureQueue = 0;
+    }
 
     if ( NULL != mCameraAdapter )
        {
@@ -1981,9 +1987,32 @@ status_t CameraHal::takePicture( )
  */
 status_t CameraHal::cancelPicture( )
 {
+    bool restartImageCapture = false;
+    status_t ret = NO_ERROR;
+
     LOG_FUNCTION_NAME
-    ///@todo Implement this when image capture will be supported
-    return NO_ERROR;
+
+    if (mImageCaptureRunning)
+    {
+        Mutex::Autolock lock(mLock);
+
+        mCameraAdapter->sendCommand(CameraAdapter::CAMERA_STOP_IMAGE_CAPTURE);
+        mImageCaptureRunning = false;
+
+        if ( 0 < mTakePictureQueue )
+        {
+            mTakePictureQueue--;
+            restartImageCapture = true;
+        }
+
+    }
+
+    if ( restartImageCapture )
+    {
+        ret = takePicture();
+    }
+
+    return ret;
 }
 
 /**

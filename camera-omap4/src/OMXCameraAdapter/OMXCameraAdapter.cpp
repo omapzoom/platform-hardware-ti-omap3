@@ -286,12 +286,36 @@ status_t OMXCameraAdapter::initialize(int sensor_index)
     mGPSData.mProcMethodValid = false;
     mGPSData.mVersionIdValid = false;
 
+    // initialize command handling thread
+    if(mCommandHandler.get() == NULL)
+        mCommandHandler = new CommandHandler(this);
+
+    if ( NULL == mCommandHandler.get() )
+    {
+        CAMHAL_LOGEA("Couldn't create command handler");
+        return NO_MEMORY;
+    }
+
+    ret = mCommandHandler->run("CallbackThread", PRIORITY_URGENT_DISPLAY);
+    if ( ret != NO_ERROR )
+    {
+        if( ret == INVALID_OPERATION){
+            CAMHAL_LOGDA("command handler thread already runnning!!");
+        }else
+        {
+            CAMHAL_LOGEA("Couldn't run command handlerthread");
+            return ret;
+        }
+    }
+
     //Remove any unhandled events
     if ( !mEventSignalQ.isEmpty() )
         {
         for (unsigned int i = 0 ; i < mEventSignalQ.size() ; i++ )
             {
             Message *msg = mEventSignalQ.itemAt(i);
+            //remove from queue and free msg
+            mEventSignalQ.removeAt(i);
             if ( NULL != msg )
                 {
                 free(msg);
@@ -2897,7 +2921,8 @@ status_t OMXCameraAdapter::sendCommand(int operation, int value1, int value2, in
             if( mPending3Asettings )
                 apply3Asettings(mParameters3A);
 
-            ret = startImageCapture();
+            msg.command = CommandHandler::CAMERA_START_IMAGE_CAPTURE;
+            mCommandHandler->put(&msg);
             break;
             }
         case CameraAdapter::CAMERA_STOP_IMAGE_CAPTURE:
@@ -2942,9 +2967,8 @@ status_t OMXCameraAdapter::sendCommand(int operation, int value1, int value2, in
                 }
 
 #endif
-
-            ret = doAutoFocus();
-
+            msg.command = CommandHandler::CAMERA_PERFORM_AUTOFOCUS;
+            mCommandHandler->put(&msg);
             break;
 
         default:
@@ -5390,7 +5414,7 @@ status_t OMXCameraAdapter::startImageCapture()
         ret = -1;
 
         }
-
+    LOG_FUNCTION_NAME_EXIT
     return ret;
 }
 
@@ -6785,6 +6809,43 @@ status_t OMXCameraAdapter::getAutoConvergence(OMX_TI_AUTOCONVERGENCEMODETYPE *pA
     return ret;
 }
 
+bool OMXCameraAdapter::CommandHandler::Handler()
+{
+    Message msg;
+    volatile int forever = 1;
+    status_t ret = NO_ERROR;
+
+    LOG_FUNCTION_NAME
+
+    while(forever){
+        CAMHAL_LOGDA("waiting for messsage...");
+        MessageQueue::waitForMsg(&mCommandMsgQ, NULL, NULL, -1);
+        mCommandMsgQ.get(&msg);
+        CAMHAL_LOGDB("msg.command = %d", msg.command);
+        switch ( msg.command ) {
+            case CommandHandler::CAMERA_START_IMAGE_CAPTURE:
+            {
+                ret = mCameraAdapter->startImageCapture();
+                break;
+            }
+            case CommandHandler::CAMERA_PERFORM_AUTOFOCUS:
+            {
+                ret = mCameraAdapter->doAutoFocus();
+                break;
+            }
+            case CommandHandler::COMMAND_EXIT:
+            {
+                CAMHAL_LOGEA("Exiting command handler");
+                forever = 0;
+                break;
+            }
+        }
+    }
+
+    LOG_FUNCTION_NAME_EXIT
+    return false;
+}
+
 OMXCameraAdapter::OMXCameraAdapter():mComponentState (OMX_StateInvalid)
 {
     LOG_FUNCTION_NAME
@@ -6814,6 +6875,16 @@ OMXCameraAdapter::~OMXCameraAdapter()
         {
         OMX_Deinit();
         }
+
+    //Exit and free ref to command handling thread
+    if ( NULL != mCommandHandler.get() )
+    {
+        Message msg;
+        msg.command = CommandHandler::COMMAND_EXIT;
+        mCommandHandler->put(&msg);
+        mCommandHandler->requestExitAndWait();
+        mCommandHandler.clear();
+    }
 
     LOG_FUNCTION_NAME_EXIT
 }
