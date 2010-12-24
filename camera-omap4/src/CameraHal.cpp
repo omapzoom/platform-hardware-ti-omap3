@@ -369,7 +369,7 @@ status_t CameraHal::setParameters(const CameraParameters &params)
     params.getPictureSize(&w, &h);
     if ( !isResolutionValid(w, h, (const char*) mCameraPropertiesArr[CameraProperties::PROP_INDEX_SUPPORTED_PICTURE_SIZES]->mPropValue))
         {
-        CAMHAL_LOGEA("Invalid picture resolution, exiting");
+        CAMHAL_LOGEB("Invalid picture resolution %dx%d", w, h);
         ret = -EINVAL;
         }
     else
@@ -2353,7 +2353,6 @@ if(!mCameraPropertiesArr)
     ///Initialize default parameters
     initDefaultParameters();
 
-
     if ( setParameters(mParameters) != NO_ERROR )
         {
         CAMHAL_LOGEA("Failed to set default parameters?!");
@@ -2433,8 +2432,6 @@ status_t CameraHal::reloadAdapter()
     //Delete all existing instances of CameraHAL objects
     //deinitialize();
 
-    initDefaultParameters();
-
     if ( -1 != ret )
         {
         f = (CameraAdapterFactory) ::dlsym(mCameraAdapterHandle, "CameraAdapter_Factory");
@@ -2454,6 +2451,7 @@ status_t CameraHal::reloadAdapter()
                     mCameraAdapter->sendCommand(CameraAdapter::CAMERA_CANCEL_TIMEOUT);
                     mCameraAdapter->registerImageReleaseCallback(releaseImageBuffers, (void *) this);
                     mCameraAdapter->registerEndCaptureCallback(endImageCapture, (void *)this);
+                    initDefaultParameters();
                     }
                 }
             }
@@ -2620,6 +2618,7 @@ status_t CameraHal::parseResolution(const char *resStr, int &width, int &height)
     status_t ret = NO_ERROR;
     char *ctx, *pWidth, *pHeight;
     const char *sep = "x";
+    char *tmp = NULL;
 
     LOG_FUNCTION_NAME
 
@@ -2665,6 +2664,7 @@ status_t CameraHal::parseResolution(const char *resStr, int &width, int &height)
         free(resStr_copy);
         resStr_copy = NULL;
      }
+
     LOG_FUNCTION_NAME_EXIT
 
     return ret;
@@ -2738,15 +2738,200 @@ void CameraHal::insertSupportedParams()
     LOG_FUNCTION_NAME_EXIT
 }
 
+void CameraHal::extractSupportedParams()
+{
+    const char *pStr = NULL;
+    CameraParameters &p = mParameters;
+
+    LOG_FUNCTION_NAME
+
+    pStr = p.get(CameraParameters::KEY_SUPPORTED_PICTURE_SIZES);
+    if ( NULL != pStr )
+        {
+        strncpy(mCameraPropertiesArr[CameraProperties::PROP_INDEX_SUPPORTED_PICTURE_SIZES]->mPropValue,
+                      pStr, MAX_PROP_VALUE_LENGTH - 1);
+        }
+
+    pStr = p.get(CameraParameters::KEY_SUPPORTED_PICTURE_FORMATS);
+    if ( NULL != pStr )
+        {
+        strncpy(mCameraPropertiesArr[CameraProperties::PROP_INDEX_SUPPORTED_PICTURE_FORMATS]->mPropValue,
+                      pStr, MAX_PROP_VALUE_LENGTH - 1);
+        }
+
+    pStr = p.get(CameraParameters::KEY_SUPPORTED_PREVIEW_SIZES);
+    if ( NULL != pStr )
+        {
+        strncpy(mCameraPropertiesArr[CameraProperties::PROP_INDEX_SUPPORTED_PREVIEW_SIZES]->mPropValue,
+                       pStr, MAX_PROP_VALUE_LENGTH - 1);
+        }
+
+    pStr = p.get(CameraParameters::KEY_SUPPORTED_PREVIEW_FORMATS);
+    if ( NULL != pStr )
+        {
+        strncpy(mCameraPropertiesArr[CameraProperties::PROP_INDEX_SUPPORTED_PREVIEW_FORMATS]->mPropValue,
+                      pStr, MAX_PROP_VALUE_LENGTH - 1);
+        }
+
+    pStr = p.get(CameraParameters::KEY_SUPPORTED_PREVIEW_FRAME_RATES);
+    if ( NULL != pStr )
+        {
+        strncpy(mCameraPropertiesArr[CameraProperties::PROP_INDEX_SUPPORTED_PREVIEW_FRAME_RATES]->mPropValue,
+                      pStr, MAX_PROP_VALUE_LENGTH - 1);
+        }
+
+    pStr = p.get(CameraParameters::KEY_SUPPORTED_JPEG_THUMBNAIL_SIZES);
+    if ( NULL != pStr )
+        {
+        strncpy(mCameraPropertiesArr[CameraProperties::PROP_INDEX_SUPPORTED_THUMBNAIL_SIZES]->mPropValue,
+                      pStr, MAX_PROP_VALUE_LENGTH - 1);
+        }
+
+    pStr = p.get(CameraParameters::KEY_SUPPORTED_WHITE_BALANCE);
+    if ( NULL != pStr )
+        {
+        strncpy(mCameraPropertiesArr[CameraProperties::PROP_INDEX_SUPPORTED_WHITE_BALANCE]->mPropValue,
+                      pStr, MAX_PROP_VALUE_LENGTH - 1);
+        }
+
+    pStr = p.get(CameraParameters::KEY_SUPPORTED_EFFECTS);
+    if ( NULL != pStr )
+        {
+        strncpy(mCameraPropertiesArr[CameraProperties::PROP_INDEX_SUPPORTED_EFFECTS]->mPropValue,
+                      pStr, MAX_PROP_VALUE_LENGTH -1);
+        }
+
+    pStr = p.get(CameraParameters::KEY_SUPPORTED_SCENE_MODES);
+    if ( NULL != pStr )
+        {
+        strncpy(mCameraPropertiesArr[CameraProperties::PROP_INDEX_SUPPORTED_SCENE_MODES]->mPropValue,
+                      pStr, MAX_PROP_VALUE_LENGTH - 1);
+        }
+
+    pStr = p.get(CameraParameters::KEY_SUPPORTED_FOCUS_MODES);
+    if ( NULL != pStr )
+        {
+        strncpy(mCameraPropertiesArr[CameraProperties::PROP_INDEX_SUPPORTED_FOCUS_MODES]->mPropValue,
+                      pStr, MAX_PROP_VALUE_LENGTH - 1);
+        }
+
+    pStr = p.get(CameraParameters::KEY_SUPPORTED_ANTIBANDING);
+    if ( NULL != pStr )
+        {
+        strncpy(mCameraPropertiesArr[CameraProperties::PROP_INDEX_SUPPORTED_ANTIBANDING]->mPropValue,
+                      pStr, MAX_PROP_VALUE_LENGTH - 1);
+        }
+
+    pStr = p.get(CameraParameters::KEY_SUPPORTED_FLASH_MODES);
+    if ( NULL != pStr )
+        {
+        strncpy(mCameraPropertiesArr[CameraProperties::PROP_INDEX_SUPPORTED_FLASH_MODES]->mPropValue,
+                      pStr, MAX_PROP_VALUE_LENGTH - 1);
+        }
+
+    pStr = p.get(CameraParameters::KEY_MAX_EXPOSURE_COMPENSATION);
+    if ( NULL != pStr )
+        {
+        strncpy(mCameraPropertiesArr[CameraProperties::PROP_INDEX_SUPPORTED_EV_MAX]->mPropValue,
+                      pStr, MAX_PROP_VALUE_LENGTH - 1);
+        }
+
+    pStr = p.get(CameraParameters::KEY_MIN_EXPOSURE_COMPENSATION);
+    if ( NULL != pStr )
+        {
+        strncpy(mCameraPropertiesArr[CameraProperties::PROP_INDEX_SUPPORTED_EV_MIN]->mPropValue,
+                      pStr, MAX_PROP_VALUE_LENGTH - 1);
+        }
+
+    pStr = p.get(CameraParameters::KEY_EXPOSURE_COMPENSATION_STEP);
+    if ( NULL != pStr )
+        {
+        strncpy(mCameraPropertiesArr[CameraProperties::PROP_INDEX_SUPPORTED_EV_STEP]->mPropValue,
+                      pStr, MAX_PROP_VALUE_LENGTH - 1);
+        }
+
+    pStr = p.get(CameraParameters::KEY_SUPPORTED_SCENE_MODES);
+    if ( NULL != pStr )
+        {
+        strncpy(mCameraPropertiesArr[CameraProperties::PROP_INDEX_SUPPORTED_SCENE_MODES]->mPropValue,
+                      pStr, MAX_PROP_VALUE_LENGTH - 1);
+        }
+
+    pStr = p.get(TICameraParameters::KEY_SUPPORTED_EXPOSURE);
+    if ( NULL != pStr )
+        {
+        strncpy(mCameraPropertiesArr[CameraProperties::PROP_INDEX_SUPPORTED_EXPOSURE_MODES]->mPropValue,
+                      pStr, MAX_PROP_VALUE_LENGTH - 1);
+        }
+
+    pStr = p.get(TICameraParameters::KEY_SUPPORTED_ISO_VALUES);
+    if ( NULL != pStr )
+        {
+        strncpy(mCameraPropertiesArr[CameraProperties::PROP_INDEX_SUPPORTED_ISO_VALUES]->mPropValue,
+                      pStr, MAX_PROP_VALUE_LENGTH - 1);
+        }
+
+    pStr = p.get(CameraParameters::KEY_ZOOM_RATIOS);
+    if ( NULL != pStr )
+        {
+        strncpy(mCameraPropertiesArr[CameraProperties::PROP_INDEX_SUPPORTED_ZOOM_RATIOS]->mPropValue,
+                      pStr, MAX_PROP_VALUE_LENGTH - 1);
+        }
+
+    pStr = p.get(CameraParameters::KEY_MAX_ZOOM);
+    if ( NULL != pStr )
+        {
+        strncpy(mCameraPropertiesArr[CameraProperties::PROP_INDEX_SUPPORTED_ZOOM_STAGES]->mPropValue,
+                      pStr, MAX_PROP_VALUE_LENGTH - 1);
+        }
+
+    pStr = p.get(CameraParameters::KEY_ZOOM_SUPPORTED);
+    if ( NULL != pStr )
+        {
+        strncpy(mCameraPropertiesArr[CameraProperties::PROP_INDEX_ZOOM_SUPPORTED]->mPropValue,
+                      pStr, MAX_PROP_VALUE_LENGTH - 1);
+        }
+
+    pStr = p.get(CameraParameters::KEY_SMOOTH_ZOOM_SUPPORTED);
+    if ( NULL != pStr )
+        {
+        strncpy(mCameraPropertiesArr[CameraProperties::PROP_INDEX_SMOOTH_ZOOM_SUPPORTED]->mPropValue,
+                      pStr, MAX_PROP_VALUE_LENGTH - 1);
+        }
+
+    pStr = p.get(TICameraParameters::KEY_SUPPORTED_IPP);
+    if ( NULL != pStr )
+        {
+        strncpy(mCameraPropertiesArr[CameraProperties::PROP_INDEX_SUPPORTED_IPP_MODES]->mPropValue,
+                      pStr, MAX_PROP_VALUE_LENGTH - 1);
+        }
+
+    pStr = p.get(TICameraParameters::KEY_S3D_SUPPORTED);
+    if ( NULL != pStr )
+        {
+        strncpy(mCameraPropertiesArr[CameraProperties::PROP_INDEX_S3D_SUPPORTED]->mPropValue,
+                      pStr, MAX_PROP_VALUE_LENGTH - 1);
+        }
+
+    pStr = p.get(TICameraParameters::KEY_MANUALCONVERGENCE_VALUES);
+    if ( NULL != pStr )
+        {
+        strncpy(mCameraPropertiesArr[CameraProperties::PROP_INDEX_MANUALCONVERGENCE_VALUES]->mPropValue,
+                      pStr, MAX_PROP_VALUE_LENGTH - 1);
+        }
+
+    LOG_FUNCTION_NAME_EXIT
+}
+
 void CameraHal::initDefaultParameters()
 {
     //Purpose of this function is to initialize the default current and supported parameters for the currently
     //selected camera.
 
     CameraParameters &p = mParameters;
+    int currentRevision, adapterRevision;
     status_t ret = NO_ERROR;
     int width, height;
-
 
     LOG_FUNCTION_NAME
 
@@ -2761,9 +2946,6 @@ void CameraHal::initDefaultParameters()
         p.setPreviewSize(MIN_WIDTH, MIN_HEIGHT);
         }
 
-    p.setPreviewFrameRate(atoi((const char*) mCameraPropertiesArr[CameraProperties::PROP_INDEX_PREVIEW_FRAME_RATE]->mPropValue));
-    p.setPreviewFormat((const char*) mCameraPropertiesArr[CameraProperties::PROP_INDEX_PREVIEW_FORMAT]->mPropValue);
-
     ret = parseResolution((const char*) mCameraPropertiesArr[CameraProperties::PROP_INDEX_PICTURE_SIZE]->mPropValue, width, height);
 
     if ( NO_ERROR == ret )
@@ -2774,9 +2956,6 @@ void CameraHal::initDefaultParameters()
         {
         p.setPictureSize(PICTURE_WIDTH, PICTURE_HEIGHT);
         }
-
-    p.setPictureFormat((const char*) mCameraPropertiesArr[CameraProperties::PROP_INDEX_PICTURE_FORMAT]->mPropValue);
-    p.set(CameraParameters::KEY_JPEG_QUALITY, (const char*) mCameraPropertiesArr[CameraProperties::PROP_INDEX_JPEG_QUALITY]->mPropValue);
 
     ret = parseResolution((const char*) mCameraPropertiesArr[CameraProperties::PROP_INDEX_JPEG_THUMBNAIL_SIZE]->mPropValue, width, height);
 
@@ -2793,7 +2972,30 @@ void CameraHal::initDefaultParameters()
 
     insertSupportedParams();
 
+    if ( NULL != mCameraAdapter )
+        {
+        adapterRevision = mCameraAdapter->getRevision();
+        currentRevision = atoi(mCameraPropertiesArr[CameraProperties::PROP_INDEX_REVISION]->mPropValue);
+        if ( adapterRevision != currentRevision )
+            {
+            if ( NO_ERROR == mCameraAdapter->getCaps(mParameters) )
+                {
+
+                    extractSupportedParams();
+
+                    snprintf(mCameraPropertiesArr[CameraProperties::PROP_INDEX_REVISION]->mPropValue, MAX_PROP_VALUE_LENGTH - 1,
+                                "%d",
+                                adapterRevision);
+
+                    mCameraProperties->storeProperties();
+                }
+            }
+    }
+
     //Insert default values
+    p.setPreviewFrameRate(atoi((const char*) mCameraPropertiesArr[CameraProperties::PROP_INDEX_PREVIEW_FRAME_RATE]->mPropValue));
+    p.setPreviewFormat((const char*) mCameraPropertiesArr[CameraProperties::PROP_INDEX_PREVIEW_FORMAT]->mPropValue);
+    p.setPictureFormat((const char*) mCameraPropertiesArr[CameraProperties::PROP_INDEX_PICTURE_FORMAT]->mPropValue);
     p.set(CameraParameters::KEY_JPEG_QUALITY, (const char*) mCameraPropertiesArr[CameraProperties::PROP_INDEX_JPEG_QUALITY]->mPropValue);
     p.set(CameraParameters::KEY_WHITE_BALANCE, (const char*) mCameraPropertiesArr[CameraProperties::PROP_INDEX_WHITEBALANCE]->mPropValue);
     p.set(CameraParameters::KEY_EFFECT,  (const char*) mCameraPropertiesArr[CameraProperties::PROP_INDEX_EFFECT]->mPropValue);

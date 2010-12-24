@@ -137,6 +137,35 @@ static OMX_ERRORTYPE OMXCameraAdapterFillBufferDone(OMX_IN OMX_HANDLETYPE hCompo
                                         OMX_IN OMX_PTR pAppData,
                                         OMX_IN OMX_BUFFERHEADERTYPE* pBuffHeader);
 
+struct CapResolution {
+    size_t width, height;
+    const char *param;
+};
+
+struct CapPixelformat {
+    OMX_COLOR_FORMATTYPE pixelformat;
+    const char *param;
+};
+
+struct CapFramerate {
+    OMX_U32 framerate;
+    const char *param;
+};
+
+struct CapZoom {
+    OMX_S32 zoomStage;
+    const char *param;
+};
+
+struct CapEVComp {
+    OMX_S32 evComp;
+    const char *param;
+};
+
+struct CapISO {
+    OMX_U32 iso;
+    const char *param;
+};
 
 /**
   * Class which completely abstracts the camera hardware interaction from camera hal
@@ -280,7 +309,10 @@ public:
     virtual void returnFrame(void* frameBuf, CameraFrame::FrameType frameType);
 
     //API to get the caps
-    virtual status_t getCaps();
+    virtual status_t getCaps(CameraParameters &params);
+
+    //Used together with capabilities
+    virtual int getRevision();
 
     //API to give the buffers to Adapter
     virtual status_t useBuffers(CameraMode mode, void* bufArr, int num);
@@ -411,6 +443,33 @@ private:
     status_t startPreview();
     status_t stopPreview();
 
+    //OMX capabilities query
+    status_t getOMXCaps(OMX_TI_CAPTYPE *caps);
+
+    //Utility methods for OMX Capabilities
+    status_t insertCapabilities(CameraParameters &params, OMX_TI_CAPTYPE &caps);
+    status_t encodeSizeCap(OMX_TI_CAPRESTYPE &res, const CapResolution *cap, size_t capCount, char * buffer, size_t bufferSize);
+    status_t encodeISOCap(OMX_U32 maxISO, const CapISO *cap, size_t capCount, char * buffer, size_t bufferSize);
+    size_t encodeZoomCap(OMX_S32 maxZoom, const CapZoom *cap, size_t capCount, char * buffer, size_t bufferSize);
+    status_t encodeFramerateCap(OMX_U32 framerateMax, OMX_U32 framerateMin, const CapFramerate *cap, size_t capCount, char * buffer, size_t bufferSize);
+    status_t encodePixelformatCap(OMX_COLOR_FORMATTYPE format, const CapPixelformat *cap, size_t capCount, char * buffer, size_t bufferSize);
+    status_t insertImageSizes(CameraParameters &params, OMX_TI_CAPTYPE &caps);
+    status_t insertPreviewSizes(CameraParameters &params, OMX_TI_CAPTYPE &caps);
+    status_t insertThumbSizes(CameraParameters &params, OMX_TI_CAPTYPE &caps);
+    status_t insertZoomStages(CameraParameters &params, OMX_TI_CAPTYPE &caps);
+    status_t insertImageFormats(CameraParameters &params, OMX_TI_CAPTYPE &caps);
+    status_t insertPreviewFormats(CameraParameters &params, OMX_TI_CAPTYPE &caps);
+    status_t insertFramerates(CameraParameters &params, OMX_TI_CAPTYPE &caps);
+    status_t insertEVs(CameraParameters &params, OMX_TI_CAPTYPE &caps);
+    status_t insertISOModes(CameraParameters &params, OMX_TI_CAPTYPE &caps);
+    status_t insertIPPModes(CameraParameters &params, OMX_TI_CAPTYPE &caps);
+    status_t insertWBModes(CameraParameters &params, OMX_TI_CAPTYPE &caps);
+    status_t insertEffects(CameraParameters &params, OMX_TI_CAPTYPE &caps);
+    status_t insertExpModes(CameraParameters &params, OMX_TI_CAPTYPE &caps);
+    status_t insertSceneModes(CameraParameters &params, OMX_TI_CAPTYPE &caps);
+    status_t insertFocusModes(CameraParameters &params, OMX_TI_CAPTYPE &caps);
+    status_t insertFlickerModes(CameraParameters &params, OMX_TI_CAPTYPE &caps);
+
     //Video recording service
     status_t startVideoCapture();
     status_t stopVideoCapture();
@@ -456,6 +515,21 @@ private:
 public:
 
 private:
+
+    //OMX Capabilities data
+    static const CapResolution mImageCapRes [];
+    static const CapResolution mPreviewRes [];
+    static const CapResolution mThumbRes [];
+    static const CapPixelformat mPixelformats [];
+    static const CapFramerate mFramerates [];
+    static const CapZoom mZoomStages [];
+    static const CapEVComp mEVCompRanges [];
+    static const CapISO mISOStages [];
+
+    OMX_VERSIONTYPE mCompRevision;
+
+    //OMX Component UUID
+    OMX_UUIDTYPE mCompUUID;
 
     //AF callback
     status_t setFocusCallback(bool enabled);

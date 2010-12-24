@@ -112,6 +112,7 @@ LOCAL_PRELINK_MODULE := false
 
 LOCAL_SRC_FILES:= \
 	BaseCameraAdapter.cpp \
+	OMXCameraAdapter/OMXCap.cpp \
 	OMXCameraAdapter/OMXCameraAdapter.cpp \
 
 

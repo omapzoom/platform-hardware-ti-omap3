@@ -83,6 +83,10 @@ const char TICameraParameters::GBCE_DISABLE[] = "disable";
 const char TICameraParameters::MEASUREMENT_ENABLE[] = "enable";
 const char TICameraParameters::MEASUREMENT_DISABLE[] = "disable";
 
+//TI extensions for zoom
+const char TICameraParameters::ZOOM_SUPPORTED[] = "true";
+const char TICameraParameters::ZOOM_UNSUPPORTED[] = "false";
+
 // TI extensions for 2D Preview in Stereo Mode
 const char TICameraParameters::KEY_S3D2D_PREVIEW[] = "s3d2d-preview";
 const char TICameraParameters::KEY_S3D2D_PREVIEW_MODE[] = "s3d2d-preview-values";

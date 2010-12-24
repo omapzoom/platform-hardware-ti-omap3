@@ -250,7 +250,6 @@ status_t OMXCameraAdapter::initialize(int sensor_index)
 
     printComponentVersion(mCameraAdapterParameters.mHandleComp);
 
-
     mSensorIndex = sensor_index;
     mBracketingEnabled = false;
     mBracketingBuffersQueuedCount = 0;
@@ -603,14 +602,6 @@ void OMXCameraAdapter::returnFrame(void* frameBuf, CameraFrame::FrameType frameT
             }
         }
 
-}
-
-status_t OMXCameraAdapter::getCaps()
-{
-    LOG_FUNCTION_NAME
-    status_t ret = NO_ERROR;
-    LOG_FUNCTION_NAME_EXIT
-    return ret;
 }
 
 status_t OMXCameraAdapter::setParameters(const CameraParameters &params)
@@ -4226,16 +4217,23 @@ status_t OMXCameraAdapter::setNSF(OMXCameraAdapter::IPPMode mode)
     return ret;
 }
 
+int OMXCameraAdapter::getRevision()
+{
+    LOG_FUNCTION_NAME
+
+    LOG_FUNCTION_NAME_EXIT
+
+    return mCompRevision.nVersion;
+}
+
 status_t OMXCameraAdapter::printComponentVersion(OMX_HANDLETYPE handle)
 {
     status_t ret = NO_ERROR;
     OMX_ERRORTYPE eError = OMX_ErrorNone;
     OMX_VERSIONTYPE compVersion;
-    OMX_VERSIONTYPE specVersion;
     char compName[OMX_MAX_STRINGNAME_SIZE];
-    OMX_UUIDTYPE compUUID;
-    char *currentUUID;
-    size_t offset;
+    char *currentUUID = NULL;
+    size_t offset = 0;
 
     LOG_FUNCTION_NAME
 
@@ -4250,8 +4248,8 @@ status_t OMXCameraAdapter::printComponentVersion(OMX_HANDLETYPE handle)
         eError = OMX_GetComponentVersion(handle,
                                       compName,
                                       &compVersion,
-                                      &specVersion,
-                                      &compUUID
+                                      &mCompRevision,
+                                      &mCompUUID
                                     );
         if ( OMX_ErrorNone != eError )
             {
@@ -4264,14 +4262,14 @@ status_t OMXCameraAdapter::printComponentVersion(OMX_HANDLETYPE handle)
         {
         CAMHAL_LOGDB("OMX Component name: [%s]", compName);
         CAMHAL_LOGDB("OMX Component version: [%u]", ( unsigned int ) compVersion.nVersion);
-        CAMHAL_LOGDB("Spec version: [%u]", ( unsigned int ) specVersion.nVersion);
-        CAMHAL_LOGDB("Git Commit ID: [%s]", compUUID);
-        currentUUID = ( char * ) compUUID;
+        CAMHAL_LOGDB("Spec version: [%u]", ( unsigned int ) mCompRevision.nVersion);
+        CAMHAL_LOGDB("Git Commit ID: [%s]", mCompUUID);
+        currentUUID = ( char * ) mCompUUID;
         }
 
-    if ( NULL != compUUID )
+    if ( NULL != currentUUID )
         {
-        offset = strlen( ( const char * ) compUUID) + 1;
+        offset = strlen( ( const char * ) mCompUUID) + 1;
         if ( offset < OMX_MAX_STRINGNAME_SIZE )
             {
             currentUUID += offset;
@@ -4285,7 +4283,7 @@ status_t OMXCameraAdapter::printComponentVersion(OMX_HANDLETYPE handle)
 
     if ( NO_ERROR == ret )
         {
-        offset += strlen( ( const char * ) compUUID) + 1;
+        offset += strlen( ( const char * ) currentUUID) + 1;
 
         if ( offset < OMX_MAX_STRINGNAME_SIZE )
             {
@@ -4300,7 +4298,7 @@ status_t OMXCameraAdapter::printComponentVersion(OMX_HANDLETYPE handle)
 
     if ( NO_ERROR == ret )
         {
-        offset += strlen( ( const char * ) compUUID) + 1;
+        offset += strlen( ( const char * ) currentUUID) + 1;
 
         if ( offset < OMX_MAX_STRINGNAME_SIZE )
             {
