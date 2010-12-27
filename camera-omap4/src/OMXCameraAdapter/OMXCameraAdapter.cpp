@@ -616,6 +616,7 @@ status_t OMXCameraAdapter::setParameters(const CameraParameters &params)
 
     mParams = params;
 
+
     ///@todo Include more camera parameters
     int w, h;
     OMX_COLOR_FORMATTYPE pixFormat;
@@ -945,10 +946,10 @@ status_t OMXCameraAdapter::setParameters(const CameraParameters &params)
             {
             mParameters3A.FlashMode = OMX_Manual;
             }
-
-        CAMHAL_LOGEB("SceneMode %d", mParameters3A.FlashMode);
         }
 
+    LOGE("Flash Setting %s", str);
+    LOGE("FlashMode %d", mParameters3A.FlashMode);
 
     str = params.get(CameraParameters::KEY_EFFECT);
     mode = getLUTvalue_HALtoOMX( str, EffLUT);
@@ -2429,13 +2430,6 @@ status_t OMXCameraAdapter::UseBuffersPreview(void* bufArr, int num)
         return ret;
         }
 
-
-    ret = setFlashMode(mParameters3A);
-    if (NO_ERROR != ret)
-        {
-        CAMHAL_LOGEB("Error configuring flash mode %x", ret);
-        return ret;
-        }
 
     if(mCapMode == OMXCameraAdapter::VIDEO_MODE || (isS3d && (mCapMode == OMXCameraAdapter::HIGH_QUALITY)))
         {
@@ -4008,7 +4002,7 @@ OMX_ERRORTYPE OMXCameraAdapter::setScene(Gen3A_settings& Gen3A)
     return eError;
 }
 
-status_t OMXCameraAdapter::setFlashMode(Gen3A_settings& Gen3A)
+OMX_ERRORTYPE OMXCameraAdapter::setFlashMode(Gen3A_settings& Gen3A)
 {
     status_t ret = NO_ERROR;
     OMX_ERRORTYPE eError = OMX_ErrorNone;
@@ -4016,9 +4010,9 @@ status_t OMXCameraAdapter::setFlashMode(Gen3A_settings& Gen3A)
 
     LOG_FUNCTION_NAME
 
-    if ( OMX_StateLoaded != mComponentState )
+    if ( OMX_StateInvalid == mComponentState )
         {
-        CAMHAL_LOGEA("OMX component is not in loaded state");
+        CAMHAL_LOGEA("OMX component is in invalid state");
         ret = -EINVAL;
         }
 
@@ -4029,7 +4023,7 @@ status_t OMXCameraAdapter::setFlashMode(Gen3A_settings& Gen3A)
         flash.eFlashControl = ( OMX_IMAGE_FLASHCONTROLTYPE ) Gen3A.FlashMode;
 
         CAMHAL_LOGEB("Configuring flash mode 0x%x", flash.eFlashControl);
-        eError =  OMX_SetParameter(mCameraAdapterParameters.mHandleComp, (OMX_INDEXTYPE) OMX_IndexParamFlashControl, &flash);
+        eError =  OMX_SetConfig(mCameraAdapterParameters.mHandleComp, (OMX_INDEXTYPE) OMX_IndexConfigFlashControl, &flash);
         if ( OMX_ErrorNone != eError )
             {
             CAMHAL_LOGEB("Error while configuring flash mode 0x%x", eError);
@@ -4042,7 +4036,7 @@ status_t OMXCameraAdapter::setFlashMode(Gen3A_settings& Gen3A)
 
     LOG_FUNCTION_NAME_EXIT
 
-    return ret;
+    return eError;
 }
 
 
@@ -6694,6 +6688,12 @@ OMX_ERRORTYPE OMXCameraAdapter::apply3Asettings( Gen3A_settings& Gen3A )
                     {
                     ret = setExposureMode(Gen3A);
 
+                    break;
+                    }
+
+                case SetFlash:
+                    {
+                    ret = setFlashMode(mParameters3A);
                     break;
                     }
 

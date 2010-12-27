@@ -405,7 +405,7 @@ private:
     OMX_ERRORTYPE setScene(Gen3A_settings& Gen3A);
 
     //Flash modes
-    status_t setFlashMode(Gen3A_settings& Gen3A);
+    OMX_ERRORTYPE setFlashMode(Gen3A_settings& Gen3A);
 
     //Exposure Modes
     OMX_ERRORTYPE setExposureMode(Gen3A_settings& Gen3A);

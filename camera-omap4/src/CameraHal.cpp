@@ -658,10 +658,7 @@ status_t CameraHal::setParameters(const CameraParameters &params)
         CAMHAL_LOGDB("Zoom set %s", params.get(CameraParameters::KEY_ZOOM));
         mParameters.set(CameraParameters::KEY_ZOOM, valstr);
         }
-    else
-        {
-        ret = -EINVAL;
-        }
+
 
     if ( NULL != mCameraAdapter )
         {
