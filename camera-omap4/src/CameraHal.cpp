@@ -1447,6 +1447,11 @@ void CameraHal::stopPreview()
         mAppCallbackNotifier->stopPreviewCallbacks();
         }
 
+    if(mBracketingRunning)
+        {
+        stopImageBracketing();
+        }
+
 
     if ( NULL != mCameraAdapter )
        {

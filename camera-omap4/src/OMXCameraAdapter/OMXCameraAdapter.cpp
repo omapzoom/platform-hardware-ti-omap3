@@ -892,7 +892,7 @@ status_t OMXCameraAdapter::setParameters(const CameraParameters &params)
             }
 
         mParameters3A.Focus = mode;
-        CAMHAL_LOGEB("Focus %d", mParameters3A.Focus);
+        CAMHAL_LOGEB("Focus %x", mParameters3A.Focus);
         }
 
     str = params.get(TICameraParameters::KEY_TOUCH_FOCUS_POS);
@@ -5292,12 +5292,7 @@ status_t OMXCameraAdapter::startImageCapture()
             mBracketingEnabled = false;
             mCapturedFrames = mBracketingRange;
             ret = sendBracketFrames();
-            /*
-            if ( NULL != mBracketingBuffersQueued )
-                {
-                  delete mBracketingBuffersQueued;
-                }
-            */
+            goto EXIT;
             }
         }
 
