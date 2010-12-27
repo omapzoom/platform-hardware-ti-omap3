@@ -564,11 +564,11 @@ status_t OMXCameraAdapter::insertEVs(CameraParameters &params, OMX_TI_CAPTYPE &c
         {
         memset(supported, '\0', MAX_PROP_VALUE_LENGTH);
 
-        snprintf(supported, MAX_PROP_VALUE_LENGTH, "%d", ( int ) ( ( caps.xEVCompensationMin >> 16 ) * 10 ));
+        snprintf(supported, MAX_PROP_VALUE_LENGTH, "%d", ( int ) ( caps.xEVCompensationMin * 10 ));
         params.set(CameraParameters::KEY_MIN_EXPOSURE_COMPENSATION, supported);
 
-        snprintf(supported, MAX_PROP_VALUE_LENGTH, "%d", ( int ) ( ( caps.xEVCompensationMax >> 16 ) * 10 ));
-        params.set(CameraParameters::KEY_MIN_EXPOSURE_COMPENSATION, supported);
+        snprintf(supported, MAX_PROP_VALUE_LENGTH, "%d", ( int ) ( caps.xEVCompensationMax * 10 ));
+        params.set(CameraParameters::KEY_MAX_EXPOSURE_COMPENSATION, supported);
         }
 
     LOG_FUNCTION_NAME
@@ -985,7 +985,7 @@ status_t OMXCameraAdapter::getCaps(CameraParameters &params)
 
     LOG_FUNCTION_NAME
 
-#if OMX_CAP_TEST
+#ifdef OMX_CAP_TEST
 
     //For testing purposes
 
