@@ -387,6 +387,7 @@ const char *metering[] = {
     "average",
 };
 int meter_mode = 0;
+bool bLogSysLinkTrace = true;
 
 //forward declarations
 int closeCamera();
@@ -2000,6 +2001,14 @@ char *load_script(char *config) {
     if(system(log_cmd))
           printf("\nCould not execute %s command\n",log_cmd);
 
+    /*Start Syslink trace before executing script*/
+    if(bLogSysLinkTrace) {
+        if(!sprintf(log_cmd,"/system/bin/syslink_trace_daemon.out > /sdcard/%s/syslink_trace.txt &",dir_name))
+            printf(" Sprintf Error");
+        if(system(log_cmd))
+            printf("\nCould not execute %s command\n",log_cmd);
+    }
+
     return script;
 }
 
@@ -2682,8 +2691,11 @@ int execute_functional_script(char *script) {
 
                 if(system("exit"))
                       printf("Exit command failed");
-                else
+                else {
                       printf("\nlogcat for script %s is complete\n Saved @ location: %s\n",script_name,dir_path);
+                      if (bLogSysLinkTrace)
+                          printf("\nsyslink_trace is saved @ location: %s\n",dir_path);
+                }
                 goto exit;
 
             case '\n':
@@ -3020,7 +3032,8 @@ void print_usage() {
     printf(" F or f -> Functional tests \n");
     printf(" A or a -> API tests \n");
     printf(" E or e -> Error scenario tests \n");
-    printf(" S or s -> Stress tests \n\n");
+    printf(" S or s -> Stress tests; with syslink trace \n");
+    printf(" SN or sn -> Stress tests; No syslink trace \n\n");
     printf(" <script>\n----------\n");
     printf("Script name (Only for stress tests)\n\n");
     return;
@@ -3309,6 +3322,10 @@ int main(int argc, char *argv[]) {
                 break;
         }
     } else if ( ( argc == 3) && ( ( *argv[1] == 'S' ) || ( *argv[1] == 's') ) ) {
+
+        if((argv[1][1] == 'N') || (argv[1][1] == 'n')) {
+            bLogSysLinkTrace = false;
+        }
 
         ProcessState::self()->startThreadPool();
 
