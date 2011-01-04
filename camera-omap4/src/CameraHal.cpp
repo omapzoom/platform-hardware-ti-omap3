@@ -650,6 +650,10 @@ status_t CameraHal::setParameters(const CameraParameters &params)
         CAMHAL_LOGDB("Exposure Bracketing set %s", params.get(TICameraParameters::KEY_EXP_BRACKETING_RANGE));
         mParameters.set(TICameraParameters::KEY_EXP_BRACKETING_RANGE, params.get(TICameraParameters::KEY_EXP_BRACKETING_RANGE));
         }
+    else
+        {
+        mParameters.remove(TICameraParameters::KEY_EXP_BRACKETING_RANGE);
+        }
 
     if( ( (valstr = params.get(CameraParameters::KEY_ZOOM)) != NULL )
         && (params.getInt(CameraParameters::KEY_ZOOM) >= 0 )

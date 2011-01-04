@@ -929,6 +929,8 @@ status_t OMXCameraAdapter::setParameters(const CameraParameters &params)
     str = params.get(TICameraParameters::KEY_EXP_BRACKETING_RANGE);
     if ( NULL != str ) {
         parseExpRange(str, mExposureBracketingValues, EXP_BRACKET_RANGE, mExposureBracketingValidEntries);
+    } else {
+        mExposureBracketingValidEntries = 0;
     }
 
     str = params.get(CameraParameters::KEY_EXPOSURE_COMPENSATION);
@@ -2658,11 +2660,8 @@ status_t OMXCameraAdapter::UseBuffersCapture(void* bufArr, int num)
         return ret;
         }
 
-    if ( 0 < mExposureBracketingValidEntries )
-        {
-        ret = setExposureBracketing( mExposureBracketingValues,
-                                                   mExposureBracketingValidEntries, mBurstFrames);
-        }
+    ret = setExposureBracketing( mExposureBracketingValues,
+                                               mExposureBracketingValidEntries, mBurstFrames);
     if ( ret != NO_ERROR )
         {
         CAMHAL_LOGEB("setExposureBracketing() failed %d", ret);
@@ -3666,23 +3665,20 @@ status_t OMXCameraAdapter::setExposureBracketing(int *evValues, size_t evCount, 
         ret = -EINVAL;
         }
 
-    if ( 1 > evCount )
-        {
-        CAMHAL_LOGEB("Exposure compensation values count set to %d", evCount);
-        ret = -EINVAL;
-        }
-
-    if ( 1 > frameCount )
-        {
-        ret = -EINVAL;
-        }
-
     if ( NO_ERROR == ret )
         {
         OMX_INIT_STRUCT_PTR (&expCapMode, OMX_CONFIG_CAPTUREMODETYPE);
         expCapMode.nPortIndex = mCameraAdapterParameters.mImagePortIndex;
-        expCapMode.bFrameLimited = OMX_TRUE;
-        expCapMode.nFrameLimit = frameCount;
+
+        if ( 0 == evCount )
+            {
+            expCapMode.bFrameLimited = OMX_FALSE;
+            }
+        else
+            {
+            expCapMode.bFrameLimited = OMX_TRUE;
+            expCapMode.nFrameLimit = frameCount;
+            }
 
         eError =  OMX_SetConfig(mCameraAdapterParameters.mHandleComp, OMX_IndexConfigCaptureMode, &expCapMode);
         if ( OMX_ErrorNone != eError )
@@ -3699,9 +3695,17 @@ status_t OMXCameraAdapter::setExposureBracketing(int *evValues, size_t evCount, 
         {
         OMX_INIT_STRUCT_PTR (&extExpCapMode, OMX_CONFIG_EXTCAPTUREMODETYPE);
         extExpCapMode.nPortIndex = mCameraAdapterParameters.mImagePortIndex;
-        extExpCapMode.bEnableBracketing = OMX_TRUE;
-        extExpCapMode.tBracketConfigType.eBracketMode = OMX_BracketExposureRelativeInEV;
-        extExpCapMode.tBracketConfigType.nNbrBracketingValues = evCount;
+
+        if ( 0 == evCount )
+            {
+            extExpCapMode.bEnableBracketing = OMX_FALSE;
+            }
+        else
+            {
+            extExpCapMode.bEnableBracketing = OMX_TRUE;
+            extExpCapMode.tBracketConfigType.eBracketMode = OMX_BracketExposureRelativeInEV;
+            extExpCapMode.tBracketConfigType.nNbrBracketingValues = evCount;
+            }
 
         for ( unsigned int i = 0 ; i < evCount ; i++ )
             {
