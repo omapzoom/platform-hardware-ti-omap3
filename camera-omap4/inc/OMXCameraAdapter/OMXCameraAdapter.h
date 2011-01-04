@@ -511,6 +511,33 @@ private:
     status_t setAutoConvergence(OMX_TI_AUTOCONVERGENCEMODETYPE pACMode, OMX_S32 pManualConverence);
     status_t getAutoConvergence(OMX_TI_AUTOCONVERGENCEMODETYPE *pACMode, OMX_S32 *pManualConverence);
 
+    class CommandHandler : public Thread {
+        public:
+            CommandHandler(OMXCameraAdapter* ca)
+                : Thread(false), mCameraAdapter(ca) { }
+
+            virtual bool threadLoop() {
+                bool ret;
+                ret = Handler();
+                return ret;
+            }
+
+            status_t put(Message* msg){
+                return mCommandMsgQ.put(msg);
+            }
+
+            enum {
+                COMMAND_EXIT = -1,
+                CAMERA_START_IMAGE_CAPTURE = 0,
+                CAMERA_PERFORM_AUTOFOCUS
+            };
+
+        private:
+            bool Handler();
+            MessageQueue mCommandMsgQ;
+            OMXCameraAdapter* mCameraAdapter;
+    };
+    sp<CommandHandler> mCommandHandler;
 
 public:
 
