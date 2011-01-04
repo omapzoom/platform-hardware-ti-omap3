@@ -4466,9 +4466,12 @@ status_t OMXCameraAdapter::setCaptureMode(OMXCameraAdapter::CaptureMode mode)
     status_t ret = NO_ERROR;
     OMX_ERRORTYPE eError = OMX_ErrorNone;
     OMX_CONFIG_CAMOPERATINGMODETYPE camMode;
-
+    OMX_CONFIG_BOOLEANTYPE bCAC;
 
     LOG_FUNCTION_NAME
+
+    OMX_INIT_STRUCT_PTR (&bCAC, OMX_CONFIG_BOOLEANTYPE);
+    bCAC.bEnabled = OMX_FALSE;
 
     if ( NO_ERROR == ret )
         {
@@ -4488,6 +4491,7 @@ status_t OMXCameraAdapter::setCaptureMode(OMXCameraAdapter::CaptureMode mode)
             {
             CAMHAL_LOGDA("Camera mode: HIGH QUALITY");
             camMode.eCamOperatingMode = OMX_CaptureImageProfileBase;
+            bCAC.bEnabled = OMX_TRUE;
             }
         else if( OMXCameraAdapter::VIDEO_MODE == mode )
             {
@@ -4511,6 +4515,22 @@ status_t OMXCameraAdapter::setCaptureMode(OMXCameraAdapter::CaptureMode mode)
             else
                 {
                 CAMHAL_LOGDA("Camera mode configured successfully");
+                }
+            }
+
+        if(ret != -1)
+            {
+            //Configure CAC
+            eError =  OMX_SetConfig(mCameraAdapterParameters.mHandleComp,
+                                    ( OMX_INDEXTYPE ) OMX_IndexConfigChromaticAberrationCorrection, &bCAC);
+            if ( OMX_ErrorNone != eError )
+                {
+                CAMHAL_LOGEB("Error while configuring CAC 0x%x", eError);
+                ret = -1;
+                }
+            else
+                {
+                CAMHAL_LOGDA("CAC configured successfully");
                 }
             }
         }
