@@ -1024,6 +1024,7 @@ status_t OMXCameraAdapter::setParameters(const CameraParameters &params)
 
     CAMHAL_LOGVB("Capture Mode set %d", mCapMode);
 
+    /// Configure IPP, LDCNSF, GBCE and GLBCE only in HQ mode
     if(mCapMode == OMXCameraAdapter::HIGH_QUALITY)
         {
           if ( (valstr = params.get(TICameraParameters::KEY_IPP)) != NULL )
@@ -1055,11 +1056,62 @@ status_t OMXCameraAdapter::setParameters(const CameraParameters &params)
             }
 
         CAMHAL_LOGEB("IPP Mode set %d", mIPP);
+
+        if (((valstr = params.get(TICameraParameters::KEY_GBCE)) != NULL) )
+            {
+            // Configure GBCE only if the setting has changed since last time
+            if(strcmp(valstr, mParams.get(TICameraParameters::KEY_GBCE)) != 0)
+                {
+                if (strcmp(valstr, ( const char * ) TICameraParameters::GBCE_ENABLE ) == 0)
+                    {
+                    setGBCE(OMXCameraAdapter::BRIGHTNESS_ON);
+                    }
+                else if (strcmp(valstr, ( const char * ) TICameraParameters::GBCE_DISABLE ) == 0)
+                    {
+                    setGBCE(OMXCameraAdapter::BRIGHTNESS_OFF);
+                    }
+                else
+                    {
+                    setGBCE(OMXCameraAdapter::BRIGHTNESS_OFF);
+                    }
+                }
+            }
+        else
+            {
+            //Disable GBCE by default
+            setGBCE(OMXCameraAdapter::BRIGHTNESS_OFF);
+            }
+
+        if ( ( valstr = params.get(TICameraParameters::KEY_GLBCE) ) != NULL )
+            {
+            // Configure GLBCE only if the setting has changed since last time
+            if(strcmp(valstr, mParams.get(TICameraParameters::KEY_GLBCE)) != 0)
+                {
+                if (strcmp(valstr, ( const char * ) TICameraParameters::GLBCE_ENABLE ) == 0)
+                    {
+                    setGLBCE(OMXCameraAdapter::BRIGHTNESS_ON);
+                    }
+                else if (strcmp(valstr, ( const char * ) TICameraParameters::GLBCE_DISABLE ) == 0)
+                    {
+                    setGLBCE(OMXCameraAdapter::BRIGHTNESS_OFF);
+                    }
+                else
+                    {
+                    setGLBCE(OMXCameraAdapter::BRIGHTNESS_OFF);
+                    }
+                }
+            }
+        else
+            {
+            //Disable GLBCE by default
+            setGLBCE(OMXCameraAdapter::BRIGHTNESS_OFF);
+            }
         }
     else
         {
         mIPP = OMXCameraAdapter::IPP_NONE;
         }
+
 
     if ( params.getInt(TICameraParameters::KEY_BURST)  >= 1 )
         {
@@ -1077,68 +1129,25 @@ status_t OMXCameraAdapter::setParameters(const CameraParameters &params)
     // SO disabling it for VIDEO_MODE as VIDEO_MODE dont need FD
     if (mCapMode != OMXCameraAdapter::VIDEO_MODE)
         {
-        if ( (valstr = params.get(TICameraParameters::KEY_FACE_DETECTION_ENABLE)) != NULL )
+        if ( ((valstr = params.get(TICameraParameters::KEY_FACE_DETECTION_ENABLE)) != NULL) )
             {
-            if (strcmp(valstr, (const char *) TICameraParameters::FACE_DETECTION_ENABLE) == 0)
+            // Configure FD only if the setting has changed since last time
+            if(strcmp(valstr, mParams.get(TICameraParameters::KEY_FACE_DETECTION_ENABLE)) != 0)
                 {
-                setFaceDetection(true);
+                if (strcmp(valstr, (const char *) TICameraParameters::FACE_DETECTION_ENABLE) == 0)
+                    {
+                    setFaceDetection(true);
+                    }
+               else if (strcmp(valstr, (const char *) TICameraParameters::FACE_DETECTION_DISABLE) == 0)
+                    {
+                    setFaceDetection(false);
+                    }
+               else
+                    {
+                    setFaceDetection(false);
+                    }
                 }
-           else if (strcmp(valstr, (const char *) TICameraParameters::FACE_DETECTION_DISABLE) == 0)
-                {
-                setFaceDetection(false);
-                }
-           else
-                {
-                setFaceDetection(false);
-                }
             }
-        else
-            {
-            //Disable face detection by default
-            setFaceDetection(false);
-            }
-        }
-
-    if ( (valstr = params.get(TICameraParameters::KEY_GBCE)) != NULL )
-        {
-        if (strcmp(valstr, ( const char * ) TICameraParameters::GBCE_ENABLE ) == 0)
-            {
-            setGBCE(OMXCameraAdapter::BRIGHTNESS_ON);
-            }
-        else if (strcmp(valstr, ( const char * ) TICameraParameters::GBCE_DISABLE ) == 0)
-            {
-            setGBCE(OMXCameraAdapter::BRIGHTNESS_OFF);
-            }
-        else
-            {
-            setGBCE(OMXCameraAdapter::BRIGHTNESS_OFF);
-            }
-        }
-    else
-        {
-        //Disable GBCE by default
-        setGBCE(OMXCameraAdapter::BRIGHTNESS_OFF);
-        }
-
-    if ( ( valstr = params.get(TICameraParameters::KEY_GLBCE) ) != NULL )
-        {
-        if (strcmp(valstr, ( const char * ) TICameraParameters::GLBCE_ENABLE ) == 0)
-            {
-            setGLBCE(OMXCameraAdapter::BRIGHTNESS_ON);
-            }
-        else if (strcmp(valstr, ( const char * ) TICameraParameters::GLBCE_DISABLE ) == 0)
-            {
-            setGLBCE(OMXCameraAdapter::BRIGHTNESS_OFF);
-            }
-        else
-            {
-            setGLBCE(OMXCameraAdapter::BRIGHTNESS_OFF);
-            }
-        }
-    else
-        {
-        //Disable GLBCE by default
-        setGLBCE(OMXCameraAdapter::BRIGHTNESS_OFF);
         }
 
     if ( (valstr = params.get(TICameraParameters::KEY_MEASUREMENT_ENABLE)) != NULL )
