@@ -5609,7 +5609,7 @@ status_t OMXCameraAdapter::startVideoCapture()
 
 status_t OMXCameraAdapter::stopVideoCapture()
 {
-    Mutex::Autolock lock(mVideoBufferLock);
+
     OMX_ERRORTYPE eError = OMX_ErrorNone;
 
     OMXCameraPortParameters *port = &mCameraAdapterParameters.mCameraPortParams[mCameraAdapterParameters.mPrevPortIndex];;
@@ -5622,40 +5622,8 @@ status_t OMXCameraAdapter::stopVideoCapture()
 
     for(unsigned int i=0;i<mVideoBuffersAvailable.size();i++)
         {
-        int refCount = 0;
         void *frameBuf = (void*) mVideoBuffersAvailable.keyAt(i);
-
-        refCount = mVideoBuffersAvailable.valueFor( ( unsigned int ) frameBuf );
-        if ( 0 >= refCount )
-            {
-            CAMHAL_LOGEB("Error trying to decrement refCount %d for buffer 0x%x", (uint32_t)refCount, (uint32_t)frameBuf);
-            return BAD_VALUE;
-            }
-
-        refCount--;
-        mVideoBuffersAvailable.replaceValueFor(  ( unsigned int ) frameBuf, refCount);
-
-        //Query preview subscribers for this buffer
-        refCount += mPreviewBuffersAvailable.valueFor( ( unsigned int ) frameBuf);
-
-        //check if someone is holding this buffer
-        if ( 0 == refCount )
-            {
-            for ( int i = 0 ; i < port->mNumBufs ; i++)
-                {
-
-                if ( port->mBufferHeader[i]->pBuffer == frameBuf )
-                    {
-                    CAMHAL_LOGDB("Sending Frame 0x%x back to Ducati for filling", (unsigned int) frameBuf);
-                    eError = OMX_FillThisBuffer(mCameraAdapterParameters.mHandleComp, port->mBufferHeader[i]);
-                    if ( eError != OMX_ErrorNone )
-                        {
-                        CAMHAL_LOGEB("OMX_FillThisBuffer %d", eError);
-                        return BAD_VALUE;
-                        }
-                    }
-                }
-              }
+        returnFrame(frameBuf, CameraFrame::VIDEO_FRAME_SYNC);
         }
 
     mVideoBuffersAvailable.clear();
@@ -6201,6 +6169,7 @@ OMX_ERRORTYPE OMXCameraAdapter::OMXCameraAdapterFillBufferDone(OMX_IN OMX_HANDLE
     pPortParam = &(mCameraAdapterParameters.mCameraPortParams[pBuffHeader->nOutputPortIndex]);
     if (pBuffHeader->nOutputPortIndex == OMX_CAMERA_PORT_VIDEO_OUT_PREVIEW)
         {
+
         recalculateFPS();
 
             {
