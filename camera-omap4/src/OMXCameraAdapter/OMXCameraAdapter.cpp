@@ -637,9 +637,7 @@ status_t OMXCameraAdapter::setParameters(const CameraParameters &params)
     status_t ret = NO_ERROR;
     bool updateImagePortParams = false;
     const char *valstr = NULL;
-
-    mParams = params;
-
+    const char *oldstr = NULL;
 
     ///@todo Include more camera parameters
     int w, h;
@@ -1062,7 +1060,19 @@ status_t OMXCameraAdapter::setParameters(const CameraParameters &params)
         if (((valstr = params.get(TICameraParameters::KEY_GBCE)) != NULL) )
             {
             // Configure GBCE only if the setting has changed since last time
-            if(strcmp(valstr, mParams.get(TICameraParameters::KEY_GBCE)) != 0)
+            oldstr = mParams.get(TICameraParameters::KEY_GBCE);
+            bool cmpRes = true;
+            if ( NULL != oldstr )
+                {
+                cmpRes = strcmp(valstr, oldstr) != 0;
+                }
+            else
+                {
+                cmpRes = true;
+                }
+
+
+            if( cmpRes )
                 {
                 if (strcmp(valstr, ( const char * ) TICameraParameters::GBCE_ENABLE ) == 0)
                     {
@@ -1087,7 +1097,20 @@ status_t OMXCameraAdapter::setParameters(const CameraParameters &params)
         if ( ( valstr = params.get(TICameraParameters::KEY_GLBCE) ) != NULL )
             {
             // Configure GLBCE only if the setting has changed since last time
-            if(strcmp(valstr, mParams.get(TICameraParameters::KEY_GLBCE)) != 0)
+
+            oldstr = mParams.get(TICameraParameters::KEY_GLBCE);
+            bool cmpRes = true;
+            if ( NULL != oldstr )
+                {
+                cmpRes = strcmp(valstr, oldstr) != 0;
+                }
+            else
+                {
+                cmpRes = true;
+                }
+
+
+            if( cmpRes )
                 {
                 if (strcmp(valstr, ( const char * ) TICameraParameters::GLBCE_ENABLE ) == 0)
                     {
@@ -1134,7 +1157,18 @@ status_t OMXCameraAdapter::setParameters(const CameraParameters &params)
         if ( ((valstr = params.get(TICameraParameters::KEY_FACE_DETECTION_ENABLE)) != NULL) )
             {
             // Configure FD only if the setting has changed since last time
-            if(strcmp(valstr, mParams.get(TICameraParameters::KEY_FACE_DETECTION_ENABLE)) != 0)
+            oldstr = mParams.get(TICameraParameters::KEY_FACE_DETECTION_ENABLE);
+            bool cmpRes = true;
+            if ( NULL != oldstr )
+                {
+                cmpRes = strcmp(valstr, oldstr) != 0;
+                }
+            else
+                {
+                cmpRes = true;
+                }
+
+            if ( cmpRes )
                 {
                 if (strcmp(valstr, (const char *) TICameraParameters::FACE_DETECTION_ENABLE) == 0)
                     {
@@ -1149,6 +1183,7 @@ status_t OMXCameraAdapter::setParameters(const CameraParameters &params)
                     setFaceDetection(false);
                     }
                 }
+
             }
         }
 
@@ -1427,6 +1462,7 @@ status_t OMXCameraAdapter::setParameters(const CameraParameters &params)
         mGPSData.mVersionIdValid = false;
         }
 
+    mParams = params;
     mFirstTimeInit = false;
 
     LOG_FUNCTION_NAME_EXIT
@@ -6177,7 +6213,7 @@ OMX_ERRORTYPE OMXCameraAdapter::OMXCameraAdapterFillBufferDone(OMX_IN OMX_HANDLE
             if ( mFaceDetectionRunning )
                 {
                 detectFaces(pBuffHeader);
-                CAMHAL_LOGDB("Faces detected: %s", mFaceDectionResult);
+                CAMHAL_LOGVB("Faces detected: %s", mFaceDectionResult);
                 }
             }
 
