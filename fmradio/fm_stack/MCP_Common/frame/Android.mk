@@ -10,9 +10,11 @@ LOCAL_CFLAGS+= -DANDROID -DMCP_STK_ENABLE -W -Wall
 
 ifeq ($(PLATFORM_VERSION),1.6)
     BTIPS_SDK_VER=1.6
-else
-    BTIPS_SDK_VER=2.0
-endif
+endif	
+ifeq ($(PLATFORM_VERSION),2.2)
+    BTIPS_SDK_VER=2.2
+endif	
+BTIPS_SDK_VER?=2.0
 
 ifeq ($(BTIPS_DEBUG),1)
     LOCAL_CFLAGS+= -g -O0
@@ -36,24 +38,25 @@ LOCAL_SRC_FILES:= \
                 mcp_utils.c \
                 mcp_log_common.c \
                 mcp_unicode.c \
-				mcpf_msg.c \
-				mcpf_services.c \
-				mcpf_sll.c \
-				mcpf_time.c \
+                mcpf_msg.c \
+                mcpf_services.c \
+                mcpf_sll.c \
+                mcpf_time.c \
                 ../Platform/hw/LINUX/android_$(BTIPS_TARGET_PLATFORM)/mcp_hal_pm.c \
-				../Platform/hw/LINUX/pla_hw.c \
-				../Platform/os/LINUX/common/mcp_linux_line_parser.c \
-				../Platform/os/LINUX/common/mcp_hal_memory.c \
-				../Platform/os/LINUX/common/mcp_hal_string.c \
+                ../Platform/hw/LINUX/pla_hw.c \
+                ../Platform/os/LINUX/common/mcp_linux_line_parser.c \
+                ../Platform/os/LINUX/common/mcp_hal_memory.c \
+                ../Platform/os/LINUX/common/mcp_hal_string.c \
                 ../Platform/os/LINUX/android_$(BTIPS_TARGET_PLATFORM)/mcp_hal_os.c \
-				../Platform/os/LINUX/common/mcp_hal_misc.c \
-				../Platform/os/LINUX/common/mcp_hal_log.c \
-				../Platform/os/LINUX/common/mcp_hal_fs.c \
-				../Platform/os/LINUX/common/mcp_hal_st.c \
-				../Platform/os/LINUX/common/pla_cmdParse.c \
-				../Platform/os/LINUX/common/pla_os.c \
-				../Platform/os/LINUX/common/mcp_hal_socket.c \
-				../Platform/os/LINUX/common/mcp_hal_hci.c \
+                ../Platform/os/LINUX/android_$(BTIPS_TARGET_PLATFORM)/mcp_nal.c \
+                ../Platform/os/LINUX/common/mcp_hal_misc.c \
+                ../Platform/os/LINUX/common/mcp_hal_log.c \
+                ../Platform/os/LINUX/common/mcp_hal_fs.c \
+                ../Platform/os/LINUX/common/mcp_hal_st.c \
+                ../Platform/os/LINUX/common/pla_cmdParse.c \
+                ../Platform/os/LINUX/common/pla_os.c \
+                ../Platform/os/LINUX/common/mcp_hal_socket.c \
+                ../Platform/os/LINUX/common/mcp_hal_hci.c \
                 ../Platform/init_script/android_$(BTIPS_TARGET_PLATFORM)/mcp_rom_scripts.c
 
 
