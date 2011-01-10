@@ -591,6 +591,7 @@ LOGV("%s", __FUNCTION__);
             if (fm_enable) {
                 LOGE("FM ABE speaker");
                 control.set("DL2 Capture Playback Volume", 115);
+                control.set("DL1 Capture Playback Volume", 0, -1);
             }
         } else {
             /* OMAP4 ABE */
@@ -644,6 +645,7 @@ LOGV("%s", __FUNCTION__);
             if (fm_enable) {
                 LOGI("FM Enabled, DL1 Capture-Playback Vol ON");
                 control.set("DL1 Capture Playback Volume", 115);
+                control.set("DL2 Capture Playback Volume", 0, -1);
             }
         } else {
             /* OMAP4 ABE */
@@ -703,6 +705,11 @@ LOGV("%s", __FUNCTION__);
             control.set("Analog Right Capture Route", "Aux/FM Right");   // FM -> Mic Mux
             control.set("Capture Preamplifier Volume", 1);
             control.set("Capture Volume", 1);
+            control.set("AMIC_UL PDM Switch", 1);
+            control.set("MUX_UL10", "AMic1");
+            control.set("MUX_UL11", "AMic0");
+            control.set("MUX_VX1", "AMic0");
+            control.set("MUX_VX0", "AMic1");
         } else if(devices & OMAP4_IN_SCO) {
             LOGI("OMAP4 ABE set for BT SCO Headset");
             control.set("AMIC_UL PDM Switch", 0, 0);
