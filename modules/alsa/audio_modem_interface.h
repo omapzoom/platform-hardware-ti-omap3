@@ -38,7 +38,8 @@ class AudioModemInterface
         AUDIO_MODEM_HANDSET =   AudioSystem::DEVICE_OUT_EARPIECE,
         AUDIO_MODEM_HANDFREE =  AudioSystem::DEVICE_OUT_SPEAKER,
         AUDIO_MODEM_HEADSET =   AudioSystem::DEVICE_OUT_WIRED_HEADSET |
-                                AudioSystem::DEVICE_OUT_WIRED_HEADPHONE,
+                                AudioSystem::DEVICE_OUT_WIRED_HEADPHONE |
+                                AudioSystem::DEVICE_OUT_LOW_POWER,
         AUDIO_MODEM_AUX =    AudioSystem::DEVICE_OUT_AUX_DIGITAL,
         AUDIO_MODEM_BLUETOOTH = AudioSystem::DEVICE_OUT_BLUETOOTH_SCO |
                                 AudioSystem::DEVICE_OUT_BLUETOOTH_SCO_HEADSET |
