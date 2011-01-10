@@ -739,10 +739,6 @@ LOGV("%s", __FUNCTION__);
             control.set("MUX_VX1", "None");
         }
     }
-
-#ifdef AUDIO_MODEM_TI
-    audioModem->voiceCallControls(devices, mode);
-#endif
 }
 
 void setAlsaControls(alsa_handle_t *handle, uint32_t devices, int mode)
@@ -798,6 +794,10 @@ static status_t s_open(alsa_handle_t *handle, uint32_t devices, int mode)
     // ASoC multicomponent requires a valid path (frontend/backend) for
     // the device to be opened
     setAlsaControls(handle, devices, mode);
+
+#ifdef AUDIO_MODEM_TI
+    audioModem->voiceCallControls(devices, mode, true);
+#endif
 
     // The PCM stream is opened in blocking mode, per ALSA defaults.  The
     // AudioFlinger seems to assume blocking mode too, so asynchronous mode
@@ -885,7 +885,7 @@ static status_t s_route(alsa_handle_t *handle, uint32_t devices, int mode)
     }
 
 #ifdef AUDIO_MODEM_TI
-        status = audioModem->voiceCallControls(devices, mode);
+        status = audioModem->voiceCallControls(devices, mode, false);
 #endif
 
     return status;
