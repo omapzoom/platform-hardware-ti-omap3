@@ -949,7 +949,7 @@ int overlay_control_context_t::overlay_setPosition(struct overlay_control_device
     // the display.
 
     // Require a minimum size
-    if (w < 16 || h < 16) {
+    if (w < 2 || h < 2) {
         // Return an error
         rc = -1;
         goto END;
