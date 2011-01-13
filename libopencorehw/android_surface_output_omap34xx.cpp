@@ -99,11 +99,23 @@ AndroidSurfaceOutputOmap34xx::AndroidSurfaceOutputOmap34xx() :
     */
     icropX = -1;
     icropY = -1;
-    /**In the base class, this variable is initilized to 2, which is required for
-    * surface flinger based rendering. But on overlay-based platforms, its value should be overwritten.
-    * In order to get the same behavior as the previous releases, lets reset it to 0.
-    */
+    /**
+    * In the base class, this variable is initialized to a default value, the value depends on the
+    * platform render.
+    * Ideally holding buffers should not be necessary for overlay-base platforms, but OpenCORE writeAsync()
+    * must return a buffer back no matter if the buffer was render or not.
+    * To avoid using buffers that have not been render yet it's require to hold the buffers that are not render
+    * immediately by the overlay at the beginning.
+    **/
+#ifdef TARGET_OMAP4
+    mNumberOfFramesToHold = NUM_BUFFERS_TO_BE_QUEUED_FOR_OPTIMAL_PERFORMANCE;
+#else /* OMAP3 */
+    /**
+    * Since OMAP3 doesn't decode as fast as OMAP4 and use less buffers, increasing the number of buffers
+    * may cause low performance issues (i.e. frame drops)
+    **/
     mNumberOfFramesToHold = 0;
+#endif
 }
 
 AndroidSurfaceOutputOmap34xx::~AndroidSurfaceOutputOmap34xx()
