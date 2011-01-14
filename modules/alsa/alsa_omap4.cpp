@@ -152,17 +152,34 @@ void configMicChoices(uint32_t);
         ~OMAP4_IN_SCO)
 
 static alsa_handle_t _defaults[] = {
+/*
+    Desriptions and expectations for how this module interprets
+    the fields of the alsa_handle_t struct
+
+        module      : pointer to a alsa_device_t struct
+        devices     : mapping Android devices to OMAP4 Front end devices
+        curDev      : current Android device used by this handle
+        curMode     : current Android mode used by this handle
+        handle      : pointer to a snd_pcm_t ALSA handle
+        format      : bit, endianess according to ALSA definitions
+        channels    : Integer number of channels
+        sampleRate  : Desired sample rate in Hz
+        latency     : Desired Delay in usec for the ALSA buffer
+        bufferSize  : Desired Number of samples for the ALSA buffer
+        mmap        : true (1) to use mmap, false (0) to use standard writei
+        modPrivate  : pointer to the function specific to this handle
+*/
     {
         module      : 0,
         devices     : OMAP4_OUT_SCO,
         curDev      : 0,
         curMode     : 0,
         handle      : 0,
-        format      : SND_PCM_FORMAT_S16_LE, // AudioSystem::PCM_16_BIT
+        format      : SND_PCM_FORMAT_S16_LE,
         channels    : 2,
         sampleRate  : DEFAULT_SAMPLE_RATE,
-        latency     : 200000, // Desired Delay in usec
-        bufferSize  : DEFAULT_SAMPLE_RATE / 5, // Desired Number of samples
+        latency     : 200000,
+        bufferSize  : DEFAULT_SAMPLE_RATE / 5,
         mmap        : 0,
         modPrivate  : (void *)&setAlsaControls,
     },
@@ -172,11 +189,11 @@ static alsa_handle_t _defaults[] = {
         curDev      : 0,
         curMode     : 0,
         handle      : 0,
-        format      : SND_PCM_FORMAT_S16_LE, // AudioSystem::PCM_16_BIT
+        format      : SND_PCM_FORMAT_S16_LE,
         channels    : 2,
         sampleRate  : DEFAULT_SAMPLE_RATE,
-        latency     : 200000, // Desired Delay in usec
-        bufferSize  : DEFAULT_SAMPLE_RATE / 5, // Desired Number of samples
+        latency     : 200000,
+        bufferSize  : DEFAULT_SAMPLE_RATE / 5,
         mmap        : 0,
         modPrivate  : (void *)&setAlsaControls,
     },
@@ -186,11 +203,11 @@ static alsa_handle_t _defaults[] = {
         curDev      : 0,
         curMode     : 0,
         handle      : 0,
-        format      : SND_PCM_FORMAT_S16_LE, // AudioSystem::PCM_16_BIT
+        format      : SND_PCM_FORMAT_S16_LE,
         channels    : 2,
         sampleRate  : DEFAULT_SAMPLE_RATE,
-        latency     : 200000, // Desired Delay in usec
-        bufferSize  : DEFAULT_SAMPLE_RATE / 5, // Desired Number of samples
+        latency     : 200000,
+        bufferSize  : DEFAULT_SAMPLE_RATE / 5,
         mmap        : 0,
         modPrivate  : (void *)&setAlsaControls,
     },
@@ -200,25 +217,26 @@ static alsa_handle_t _defaults[] = {
         curDev      : 0,
         curMode     : 0,
         handle      : 0,
-        format      : SND_PCM_FORMAT_S16_LE, // AudioSystem::PCM_16_BIT
+        format      : SND_PCM_FORMAT_S16_LE,
         channels    : 2,
         sampleRate  : DEFAULT_SAMPLE_RATE,
-        latency     : 85333, // Desired Delay in usec
-        bufferSize  : 4096, // Desired Number of samples
+        latency     : 85333,
+        bufferSize  : 4096,
         mmap        : 1,
         modPrivate  : (void *)&setAlsaControls,
     },
     {
+        /* not currently used */
         module      : 0,
         devices     : OMAP4_OUT_LP,
         curDev      : 0,
         curMode     : 0,
         handle      : 0,
-        format      : SND_PCM_FORMAT_S16_LE, // AudioSystem::PCM_16_BIT
+        format      : SND_PCM_FORMAT_S16_LE,
         channels    : 2,
         sampleRate  : DEFAULT_SAMPLE_RATE,
-        latency     : 140000, // Desired Delay in usec
-        bufferSize  : 6144, // Desired Number of samples
+        latency     : 140000,
+        bufferSize  : 6144,
         mmap        : 1,
         modPrivate  : (void *)&setAlsaControls,
     },
@@ -228,11 +246,11 @@ static alsa_handle_t _defaults[] = {
         curDev      : 0,
         curMode     : 0,
         handle      : 0,
-        format      : SND_PCM_FORMAT_S16_LE, // AudioSystem::PCM_16_BIT
+        format      : SND_PCM_FORMAT_S16_LE,
         channels    : 1,
         sampleRate  : AudioRecord::DEFAULT_SAMPLE_RATE,
-        latency     : 250000, // Desired Delay in usec
-        bufferSize  : 2048, // Desired Number of samples
+        latency     : 250000,
+        bufferSize  : 2048,
         mmap        : 0,
         modPrivate  : (void *)&setAlsaControls,
     },
@@ -242,11 +260,11 @@ static alsa_handle_t _defaults[] = {
         curDev      : 0,
         curMode     : 0,
         handle      : 0,
-        format      : SND_PCM_FORMAT_S16_LE, // AudioSystem::PCM_16_BIT
+        format      : SND_PCM_FORMAT_S16_LE,
         channels    : 1,
         sampleRate  : AudioRecord::DEFAULT_SAMPLE_RATE,
-        latency     : 250000, // Desired Delay in usec
-        bufferSize  : 2048, // Desired Number of samples
+        latency     : 250000,
+        bufferSize  : 2048,
         mmap        : 0,
         modPrivate  : (void *)&setAlsaControls,
     },
@@ -260,7 +278,7 @@ static alsa_handle_t _defaults[] = {
         channels    : 2,
         sampleRate  : 48000,
         latency     : -1, // Doesn't matter, since it is buffer-less
-        bufferSize  : 2048, // Desired Number of samples
+        bufferSize  : 2048,
         mmap        : 0,
         modPrivate  : (void *)&setAlsaControls,
     },
@@ -464,6 +482,9 @@ status_t setHardwareParams(alsa_handle_t *handle)
     }
 
     if (strcmp(device, MM_LP_DEVICE) == 0) {
+        // we have to overwrite our ALSA size if we want to
+        // force Flinger to write for each period. This is done
+        // here internally becuase the latency() API is defined as const
         handle->bufferSize = periodSize;
         handle->latency = periodTime;
     } else {
