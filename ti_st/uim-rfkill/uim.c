@@ -33,7 +33,7 @@
 #endif
 
 #include "uim.h"
-#define HOLD_WAKE_LOCK
+
 /* Maintains the exit state of UIM*/
 static int exiting;
 
@@ -380,11 +380,6 @@ int st_uart_config()
 	int ldisc, len;
 	uim_speed_change_cmd cmd;
 
-#ifdef HOLD_WAKE_LOCK
-	int lock_fd;
-	char lock[]="uim";
-#endif
-
 	uim_bdaddr_change_cmd addr_cmd;
 
 	UIM_START_FUNC();
@@ -399,17 +394,6 @@ int st_uart_config()
 	 */
 	if (st_state == INSTALL_N_TI_WL) {
 		UIM_VER(" signal received, opening %s", uart_dev_name);
-#ifdef HOLD_WAKE_LOCK
-		lock_fd = open("/sys/power/wake_lock", O_RDWR);
-		if (lock_fd < 0) {
-			UIM_ERR("can't open %s\n", "/sys/power/wake_lock");
-			goto SKIP_LOCK_WRITE;
-		}
-		if (write(lock_fd, lock, strlen(lock)) != (int)strlen(lock))
-			UIM_ERR("cannot write %s to wake_lock\n", lock);
-		close(lock_fd);
-SKIP_LOCK_WRITE:
-#endif
 		dev_fd = open(uart_dev_name, O_RDWR);
 		if (dev_fd < 0) {
 			UIM_ERR(" Can't open %s", uart_dev_name);
@@ -510,18 +494,6 @@ SKIP_LOCK_WRITE:
 		UIM_DBG(" Installed N_TI_WL Line displine");
 	}
 	else {
-#ifdef HOLD_WAKE_LOCK
-		lock_fd = open("/sys/power/wake_unlock", O_RDWR);
-		if (lock_fd < 0) {
-			UIM_ERR("can't open %s\n", "/sys/power/wake_unlock");
-			goto SKIP_UNLOCK_WRITE;
-		}
-		UIM_DBG("writing %s to unlock\n", lock);
-		if (write(lock_fd, lock, strlen(lock)) != (int)strlen(lock))
-			UIM_ERR("failed to write %s\n", lock);
-		close(lock_fd);
-SKIP_UNLOCK_WRITE:
-#endif
 		UIM_DBG(" Un-Installed N_TI_WL Line displine");
 		/* UNINSTALL_N_TI_WL - When the Signal is received from KIM */
 		/* closing UART fd */
