@@ -31,7 +31,7 @@
 <antibanding>auto</antibanding>
 <exposure-mode-values>off,auto,night,backlighting,spotlight,sports,snow,beach,aperture,smallaperture,face-priority</exposure-mode-values>
 <exposure-mode>auto</exposure-mode>
-<ipp-values>gbce,off</ipp-values>
+<ipp-values>ldc-nsf,ldc,nsf,off</ipp-values>
 <ipp>off</ipp>
 <ev-compensation-min>-30</ev-compensation-min>
 <ev-compensation-max>30</ev-compensation-max>
