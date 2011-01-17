@@ -42,6 +42,7 @@ namespace android {
    @return none
  */
 MessageQueue::MessageQueue()
+: fd_read(-1), fd_write(-1), mHasMsg(false)
 {
     LOG_FUNCTION_NAME
 
