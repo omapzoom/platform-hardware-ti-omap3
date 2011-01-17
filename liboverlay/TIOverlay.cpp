@@ -900,8 +900,9 @@ int overlay_control_context_t::overlay_setPosition(struct overlay_control_device
     // Adjust the coordinate system to match the V4L change
     switch ( data->rotation ) {
     case 90:
+    case 270:
         finalWindow.posX = data->posY;
-        finalWindow.posY = data->posX;
+        finalWindow.posY = overlayobj->dispW - data->posW - data->posX;
         finalWindow.posW = data->posH;
         finalWindow.posH = data->posW;
         break;
@@ -910,12 +911,6 @@ int overlay_control_context_t::overlay_setPosition(struct overlay_control_device
         finalWindow.posY = ((overlayobj->dispH - data->posY) - data->posH);
         finalWindow.posW = data->posW;
         finalWindow.posH = data->posH;
-        break;
-    case 270:
-        finalWindow.posX = data->posY;
-        finalWindow.posY = data->posX;
-        finalWindow.posW = data->posH;
-        finalWindow.posH = data->posW;
         break;
     default: // 0
         finalWindow.posX = data->posX;
@@ -1105,7 +1100,7 @@ int overlay_control_context_t::overlay_commit(struct overlay_control_device_t *d
         finalWindow.posH = data->posW;
 #else
         finalWindow.posX = data->posY;
-        finalWindow.posY = data->posX;
+        finalWindow.posY = overlayobj->dispW - data->posW - data->posX;
         finalWindow.posW = data->posH;
         finalWindow.posH = data->posW;
 #endif
