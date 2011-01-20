@@ -31,6 +31,8 @@
 #include "TICameraParameters.h"
 #include "CameraProperties.h"
 #include "overlay_common.h"
+#include <cutils/properties.h>
+
 
 #include <poll.h>
 #include <math.h>
@@ -2214,8 +2216,10 @@ CameraHal::CameraHal()
 
 #endif
 
-    //Default is set to '0'
-    mCameraIndex = 0;
+    //Read default from system property camera.defaults.index
+    char camera_index[3] = "0";
+    property_get("camera.defaults.index", camera_index, "0");
+    mCameraIndex = atoi(camera_index);
 
     mReloadAdapter = false;
 
