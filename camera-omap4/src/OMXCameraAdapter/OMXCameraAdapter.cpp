@@ -1655,12 +1655,13 @@ void saveFile(unsigned char   *buff, int width, int height, int format) {
 }
 void OMXCameraAdapter::getParameters(CameraParameters& params)
 {
+    OMX_CONFIG_EXPOSUREVALUETYPE exp;
+    OMX_ERRORTYPE eError = OMX_ErrorNone;
+
     LOG_FUNCTION_NAME
 
 #ifdef PARAM_FEEDBACK
 
-    OMX_CONFIG_EXPOSURECONTROLTYPE exp;
-    OMX_CONFIG_EXPOSUREVALUETYPE expValues;
     OMX_CONFIG_WHITEBALCONTROLTYPE wb;
     OMX_CONFIG_FLICKERCANCELTYPE flicker;
     OMX_CONFIG_SCENEMODETYPE scene;
@@ -1722,7 +1723,6 @@ void OMXCameraAdapter::getParameters(CameraParameters& params)
     focus.nPortIndex = OMX_ALL;
 
     OMX_GetConfig( mCameraAdapterParameters.mHandleComp,OMX_IndexConfigCommonExposure, &exp);
-    OMX_GetConfig( mCameraAdapterParameters.mHandleComp,OMX_IndexConfigCommonExposureValue, &expValues);
     OMX_GetConfig( mCameraAdapterParameters.mHandleComp, OMX_IndexConfigCommonWhiteBalance, &wb);
     OMX_GetConfig( mCameraAdapterParameters.mHandleComp, (OMX_INDEXTYPE)OMX_IndexConfigFlickerCancel, &flicker );
     OMX_GetConfig( mCameraAdapterParameters.mHandleComp, (OMX_INDEXTYPE)OMX_IndexParamSceneMode, &scene);
@@ -1772,12 +1772,6 @@ void OMXCameraAdapter::getParameters(CameraParameters& params)
 
     params.set( CameraParameters::KEY_FOCUS_MODE , str );
 
-    for(int i = 0; i < IsoLUT.size; i++)
-        if( IsoLUT.Table[i].omxDefinition == ( int ) expValues.nSensitivity )
-            str = (char*)IsoLUT.Table[i].userDefinition;
-
-    params.set( TICameraParameters::KEY_ISO , str );
-
     int comp = ((expValues.xEVCompensation * 10) >> Q16_OFFSET);
 
     params.set(CameraParameters::KEY_EXPOSURE_COMPENSATION, comp );
@@ -1788,6 +1782,19 @@ void OMXCameraAdapter::getParameters(CameraParameters& params)
     params.set( TICameraParameters::KEY_SATURATION, saturation.nSaturation);
 
 #else
+
+    OMX_INIT_STRUCT_PTR (&exp, OMX_CONFIG_EXPOSUREVALUETYPE);
+    exp.nPortIndex = OMX_ALL;
+
+    eError = OMX_GetConfig( mCameraAdapterParameters.mHandleComp,OMX_IndexConfigCommonExposureValue, &exp);
+    if ( OMX_ErrorNone == eError )
+        {
+        params.set(TICameraParameters::KEY_CURRENT_ISO, exp.nSensitivity);
+        }
+    else
+        {
+        CAMHAL_LOGEB("OMX error 0x%x, while retrieving current ISO value", eError);
+        }
 
         {
         Mutex::Autolock lock(mZoomLock);
