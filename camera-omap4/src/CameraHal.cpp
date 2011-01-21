@@ -668,6 +668,18 @@ status_t CameraHal::setParameters(const CameraParameters &params)
         mParameters.set(TICameraParameters::KEY_GPS_VERSION, valstr);
         }
 
+    if( (valstr = params.get(TICameraParameters::KEY_EXIF_MODEL)) != NULL )
+        {
+        CAMHAL_LOGDB("EXIF Model set %s", params.get(TICameraParameters::KEY_EXIF_MODEL));
+        mParameters.set(TICameraParameters::KEY_EXIF_MODEL, valstr);
+        }
+
+    if( (valstr = params.get(TICameraParameters::KEY_EXIF_MAKE)) != NULL )
+        {
+        CAMHAL_LOGDB("EXIF Make set %s", params.get(TICameraParameters::KEY_EXIF_MAKE));
+        mParameters.set(TICameraParameters::KEY_EXIF_MAKE, valstr);
+        }
+
     if( (valstr = params.get(TICameraParameters::KEY_EXP_BRACKETING_RANGE)) != NULL )
         {
         CAMHAL_LOGDB("Exposure Bracketing set %s", params.get(TICameraParameters::KEY_EXP_BRACKETING_RANGE));
@@ -3127,6 +3139,8 @@ void CameraHal::initDefaultParameters()
     p.set(CameraParameters::KEY_VERTICAL_VIEW_ANGLE, (const char*) mCameraPropertiesArr[CameraProperties::PROP_INDEX_VER_ANGLE]->mPropValue);
     p.set(TICameraParameters::KEY_VIDEO_MINFRAMERATE,(const char*)mCameraPropertiesArr[CameraProperties::PROP_INDEX_VIDEO_MINFRAMERATE]->mPropValue);
     p.set(TICameraParameters::KEY_VIDEO_MINFRAMERATE_VALUES,(const char*)mCameraPropertiesArr[CameraProperties::PROP_INDEX_VIDEO_MINFRAMERATE_VALUES]->mPropValue);
+    p.set(TICameraParameters::KEY_EXIF_MAKE, (const char*) mCameraPropertiesArr[CameraProperties::PROP_INDEX_EXIF_MAKE]->mPropValue);
+    p.set(TICameraParameters::KEY_EXIF_MODEL, (const char*) mCameraPropertiesArr[CameraProperties::PROP_INDEX_EXIF_MODEL]->mPropValue);
 
     LOG_FUNCTION_NAME_EXIT
 }
