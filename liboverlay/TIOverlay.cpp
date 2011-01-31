@@ -2089,7 +2089,7 @@ int overlay_data_context_t::overlay_setCrop(struct overlay_data_device_t *dev, u
     ctx->omap_overlay->mData.cropW = w;
     ctx->omap_overlay->mData.cropH = h;
 
-    LOGE("Crop Win/X%d/Y%d/W%d/H%d\n", x, y, w, h );
+    LOGD("Crop Win/X%d/Y%d/W%d/H%d\n", x, y, w, h );
 
     rc = v4l2_overlay_set_crop(fd, x, y, w, h);
     if (rc) {
@@ -2114,7 +2114,7 @@ int overlay_data_context_t::overlay_setCrop(struct overlay_data_device_t *dev, u
         ctx->omap_overlay->mData.cropW = w;
         ctx->omap_overlay->mData.cropH = h;
 
-        LOGE("Crop Win/X%d/Y%d/W%d/H%d\n", x, y, w, h );
+        LOGD("Crop Win/X%d/Y%d/W%d/H%d\n", x, y, w, h );
         rc = v4l2_overlay_set_crop(fd, x, y, w, h);
         if (rc) {
             LOGE("Set Crop Window Failed!/%d\n", rc);
@@ -2143,16 +2143,14 @@ int overlay_data_context_t::overlay_setCrop(struct overlay_data_device_t *dev, u
         }
     }
     else {
-        /** setCrop is called only with the crop co-ordinates change and
-        * is allowed on-the-fly. Hence no need of disabling the stream and
+        /** setCrop is called only with the crop co-ordinates change
+        * this is allowed on-the-fly. Hence no need of disabling the stream and
         * the final window remains the same
         */
         ctx->omap_overlay->mData.cropX = x;
         ctx->omap_overlay->mData.cropY = y;
         ctx->omap_overlay->mData.cropW = w;
         ctx->omap_overlay->mData.cropH = h;
-
-        LOGE("Crop Win/X%d/Y%d/W%d/H%d\n", x, y, w, h );
 
         rc = v4l2_overlay_set_crop(fd, x, y, w, h);
         if (rc) {
@@ -2167,7 +2165,6 @@ int overlay_data_context_t::overlay_setCrop(struct overlay_data_device_t *dev, u
     }
 #endif
 
-    LOG_FUNCTION_NAME_EXIT;
 end:
     pthread_mutex_unlock(&ctx->omap_overlay->lock);
     return rc;
