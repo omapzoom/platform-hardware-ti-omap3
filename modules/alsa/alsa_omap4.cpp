@@ -333,6 +333,24 @@ const char *streamName(alsa_handle_t *handle)
     return snd_pcm_stream_name(direction(handle));
 }
 
+status_t updateHandle(alsa_handle_t *handle, uint32_t device)
+{
+    alsa_device_t *module = handle->module;
+    status_t err = BAD_VALUE;
+
+    for (size_t i = 0; i < ARRAY_SIZE(_defaults); i++) {
+        if (_defaults[i].devices & device) {
+            memcpy(handle, &_defaults[i], sizeof(alsa_handle_t));
+            // keep original (initialized) ALSA device module
+            handle->module = module;
+            err = NO_ERROR;
+            break;
+        }
+    }
+
+    return err;
+}
+
 status_t setHardwareParams(alsa_handle_t *handle)
 {
     snd_pcm_hw_params_t *hardwareParams;
@@ -794,6 +812,13 @@ static status_t s_open(alsa_handle_t *handle, uint32_t devices, int mode)
     //
     s_close(handle);
 
+    int err;
+    err = updateHandle(handle, devices);
+    if (err < 0) {
+        LOGE("Couldn't find a valid device in supported profiles");
+        return err;
+    }
+
     LOGD("open called for devices %08x in mode %d...", devices, mode);
 
     const char *stream = streamName(handle);
@@ -810,7 +835,7 @@ static status_t s_open(alsa_handle_t *handle, uint32_t devices, int mode)
     // The PCM stream is opened in blocking mode, per ALSA defaults.  The
     // AudioFlinger seems to assume blocking mode too, so asynchronous mode
     // should not be used.
-    int err = snd_pcm_open(&handle->handle, devName, direction(handle), 0);
+    err = snd_pcm_open(&handle->handle, devName, direction(handle), 0);
 
     if (err < 0) {
         LOGE("Failed to initialize ALSA %s device '%s': %s", stream, devName, strerror(err));
