@@ -601,13 +601,19 @@ status_t CameraHal::setParameters(const CameraParameters &params)
         mParameters.set(TICameraParameters::KEY_ISO, valstr);
         }
 
-    if( ((valstr = params.get(CameraParameters::KEY_FOCUS_MODE)) != NULL)
-        && isParameterValid(valstr,
-        (const char*) mCameraPropertiesArr[CameraProperties::PROP_INDEX_SUPPORTED_FOCUS_MODES]->mPropValue))
+    if ( (valstr = params.get(CameraParameters::KEY_FOCUS_MODE)) != NULL )
+    {
+        if ( !isParameterValid(valstr,
+                (const char*)mCameraPropertiesArr[CameraProperties::PROP_INDEX_SUPPORTED_FOCUS_MODES]->mPropValue,
+                CameraParameters::KEY_FOCUS_MODE) )
         {
+            CAMHAL_LOGEB("Invalid focus mode: %s", valstr);
+            return BAD_VALUE;
+        }
+
         CAMHAL_LOGDB("Focus mode set %s", valstr);
         mParameters.set(CameraParameters::KEY_FOCUS_MODE, valstr);
-        }
+    }
 
     if( (valstr = params.get(TICameraParameters::KEY_TOUCH_POS)) != NULL )
         {
@@ -666,13 +672,19 @@ status_t CameraHal::setParameters(const CameraParameters &params)
         mParameters.set(CameraParameters::KEY_SCENE_MODE, valstr);
         }
 
-    if(( (valstr = params.get(CameraParameters::KEY_FLASH_MODE)) != NULL)
-        && isParameterValid(valstr,
-        (const char*) mCameraPropertiesArr[CameraProperties::PROP_INDEX_SUPPORTED_FLASH_MODES]->mPropValue))
+    if ( (valstr = params.get(CameraParameters::KEY_FLASH_MODE)) != NULL )
+    {
+        if ( !isParameterValid(valstr,
+                mCameraPropertiesArr[CameraProperties::PROP_INDEX_SUPPORTED_FLASH_MODES]->mPropValue,
+                CameraParameters::KEY_FLASH_MODE) )
         {
+            CAMHAL_LOGEB("Invalid flash mode: %s", valstr);
+            return BAD_VALUE;
+        }
+
         CAMHAL_LOGDB("Flash mode set %s", valstr);
         mParameters.set(CameraParameters::KEY_FLASH_MODE, valstr);
-        }
+    }
 
     if(( (valstr = params.get(CameraParameters::KEY_EFFECT)) != NULL)
         && isParameterValid(valstr,
@@ -2688,82 +2700,53 @@ exit:
     return ret;
 }
 
-bool CameraHal::isParameterValid(const char *param, const char *supportedParams)
+bool CameraHal::isParameterValid(const char * const param, const char * const supportedParams, const char * const key)
 {
-    bool ret = true;
-    char *pos = NULL;
-
     LOG_FUNCTION_NAME
 
-    if ( NULL == supportedParams )
-        {
+    if ( !supportedParams )
+    {
         CAMHAL_LOGEA("Invalid supported parameters string");
-        ret = false;
-        goto exit;
-        }
+        LOG_FUNCTION_NAME_EXIT
+        return false;
+    }
 
-    if ( NULL == param )
-        {
+    if ( !param )
+    {
         CAMHAL_LOGEA("Invalid parameter string");
-        ret = false;
-        goto exit;
-        }
+        LOG_FUNCTION_NAME_EXIT
+        return false;
+    }
 
-    pos = strstr(supportedParams, param);
-    if ( NULL == pos )
-        {
-        ret = false;
-        }
-    else
-        {
-        ret = true;
-        }
-
-exit:
+    const char * const pos = strstr(supportedParams, param);
+    if ( !pos )
+    {
+        CAMHAL_LOGEB("Parameter: key = %s, value = \"%s\", supported values = \"%s\"",
+                key ? key : "???", param, supportedParams);
+        LOG_FUNCTION_NAME_EXIT
+        return false;
+    }
 
     LOG_FUNCTION_NAME_EXIT
-
-    return ret;
+    return true;
 }
 
-bool CameraHal::isParameterValid(int param, const char *supportedParams)
+bool CameraHal::isParameterValid(const int param, const char * const supportedParams, const char * const key)
 {
-    bool ret = true;
-    char *pos = NULL;
-    status_t status;
-    char tmpBuffer[PARAM_BUFFER + 1];
-
     LOG_FUNCTION_NAME
 
-    if ( NULL == supportedParams )
-        {
-        CAMHAL_LOGEA("Invalid supported parameters string");
-        ret = false;
-        goto exit;
-        }
+    char tmpBuffer[PARAM_BUFFER + 1];
+    const status_t status = snprintf(tmpBuffer, PARAM_BUFFER, "%d", param);
+    if ( status < 0 )
+    {
+        CAMHAL_LOGEB("Error encountered while generating validation string: %d", int(status));
+        LOG_FUNCTION_NAME_EXIT
+        return false;
+    }
 
-    status = snprintf(tmpBuffer, PARAM_BUFFER, "%d", param);
-    if ( 0 > status )
-        {
-        CAMHAL_LOGEA("Error encountered while generating validation string");
-        ret = false;
-        goto exit;
-        }
-
-    pos = strstr(supportedParams, tmpBuffer);
-    if ( NULL == pos )
-        {
-        ret = false;
-        }
-    else
-        {
-        ret = true;
-        }
-
-exit:
+    const bool ret = isParameterValid(tmpBuffer, supportedParams, key);
 
     LOG_FUNCTION_NAME_EXIT
-
     return ret;
 }
 

@@ -956,8 +956,8 @@ private:
 
             //Check if a given parameter is supported by the current camera
             // instance
-            bool isParameterValid(const char *param, const char *supportedParams);
-            bool isParameterValid(int param, const char *supportedParams);
+            bool isParameterValid(const char *param, const char *supportedParams, const char * key = 0);
+            bool isParameterValid(int param, const char *supportedParams, const char * key = 0);
 
             /** Initialize default parameters */
             void initDefaultParameters();
