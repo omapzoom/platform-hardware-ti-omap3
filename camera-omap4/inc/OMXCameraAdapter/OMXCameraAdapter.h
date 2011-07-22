@@ -268,7 +268,7 @@ public:
                 char mLatRef[GPS_REF_SIZE];
                 bool mLatValid;
                 int mAltitude;
-                char mAltitudeRef[GPS_REF_SIZE];
+                unsigned char mAltitudeRef;
                 bool mAltitudeValid;
                 char mMapDatum[GPS_MAPDATUM_SIZE];
                 bool mMapDatumValid;

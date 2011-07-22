@@ -111,7 +111,6 @@ const char TICameraParameters::KEY_EXIF_MODEL[] = "exif-model";
 const char TICameraParameters::KEY_EXIF_MAKE[] = "exif-make";
 
 //TI extensions for additiona GPS data
-const char TICameraParameters::KEY_GPS_ALTITUDE_REF[] = "gps-altitude-ref";
 const char TICameraParameters::KEY_GPS_MAPDATUM[] = "gps-mapdatum";
 const char TICameraParameters::KEY_GPS_VERSION[] = "gps-version";
 const char TICameraParameters::KEY_GPS_DATESTAMP[] = "gps-datestamp";

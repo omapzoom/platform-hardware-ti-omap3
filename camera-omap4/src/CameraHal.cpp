@@ -777,14 +777,6 @@ status_t CameraHal::setParameters(const CameraParameters &params)
             mParameters.remove(CameraParameters::KEY_GPS_PROCESSING_METHOD);
         }
 
-    if( (valstr = params.get(TICameraParameters::KEY_GPS_ALTITUDE_REF)) != NULL )
-        {
-        CAMHAL_LOGDB("GPS altitude ref set %s", valstr);
-        mParameters.set(TICameraParameters::KEY_GPS_ALTITUDE_REF, valstr);
-        }else{
-            mParameters.remove(TICameraParameters::KEY_GPS_ALTITUDE_REF);
-        }
-
     if( (valstr = params.get(TICameraParameters::KEY_GPS_MAPDATUM )) != NULL )
         {
         CAMHAL_LOGDB("GPS MAPDATUM set %s", valstr);

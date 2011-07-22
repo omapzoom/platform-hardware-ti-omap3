@@ -56,6 +56,15 @@ namespace android {
 //frames skipped before recalculating the framerate
 #define FPS_PERIOD 30
 
+inline static int roundToNearest(const double value)
+{
+    if ( value >= 0.0 )
+        return int(value + 0.5);
+
+    const int tmp = int(value - 1.0);
+    return int(value - tmp + 0.5) + tmp;
+}
+
 /*--------------------Camera Adapter Class STARTS here-----------------------------*/
 
 const char OMXCameraAdapter::EXIFASCIIPrefix [] = { 0x41, 0x53, 0x43, 0x49, 0x49, 0x0, 0x0, 0x0 };
@@ -1363,7 +1372,12 @@ status_t OMXCameraAdapter::setParameters(const CameraParameters &params)
     if( ( valstr = params.get(CameraParameters::KEY_GPS_ALTITUDE) ) != NULL )
         {
         gpsPos = strtod(valstr, NULL);
-        mEXIFData.mGPSData.mAltitude = gpsPos;
+        mEXIFData.mGPSData.mAltitude = roundToNearest(fabs(gpsPos));
+        if (gpsPos < 0) {
+            mEXIFData.mGPSData.mAltitudeRef = 1;
+        } else {
+            mEXIFData.mGPSData.mAltitudeRef = 0;
+        }
         mEXIFData.mGPSData.mAltitudeValid = true;
         }
     else
@@ -1419,16 +1433,6 @@ status_t OMXCameraAdapter::setParameters(const CameraParameters &params)
     else
         {
         mEXIFData.mGPSData.mProcMethodValid = false;
-        }
-
-    if( ( valstr = params.get(TICameraParameters::KEY_GPS_ALTITUDE_REF) ) != NULL )
-        {
-        strncpy(mEXIFData.mGPSData.mAltitudeRef, valstr, GPS_REF_SIZE-1);
-        mEXIFData.mGPSData.mAltitudeValid = true;
-        }
-    else
-        {
-        mEXIFData.mGPSData.mAltitudeValid = false;
         }
 
     if( ( valstr = params.get(TICameraParameters::KEY_GPS_MAPDATUM) ) != NULL )
@@ -1699,7 +1703,15 @@ status_t OMXCameraAdapter::setupEXIF()
              ( mEXIFData.mGPSData.mAltitudeValid) )
             {
             exifTags->ulGpsAltitude[0] = ( OMX_U32 ) mEXIFData.mGPSData.mAltitude;
+            exifTags->ulGpsAltitude[1] = 1;
             exifTags->eStatusGpsAltitude = OMX_TI_TagUpdated;
+            }
+
+        if ( ( OMX_TI_TagReadWrite == exifTags->eStatusGpsAltitudeRef ) &&
+             ( mEXIFData.mGPSData.mAltitudeValid) )
+            {
+            exifTags->ucGpsAltitudeRef = (OMX_U8) mEXIFData.mGPSData.mAltitudeRef;
+            exifTags->eStatusGpsAltitudeRef = OMX_TI_TagUpdated;
             }
 
         if ( ( OMX_TI_TagReadWrite == exifTags->eStatusGpsMapDatum ) &&
@@ -1779,31 +1791,36 @@ status_t OMXCameraAdapter::setupEXIF()
 
 status_t OMXCameraAdapter::convertGPSCoord(double coord, int *deg, int *min, int *sec)
 {
-    double tmp;
-
     LOG_FUNCTION_NAME
 
     if ( coord == 0 ) {
-
+        // REALLY???
         LOGE("Invalid GPS coordinate");
-
         return -EINVAL;
     }
 
-    *deg = (int) floor(coord);
-    tmp = ( coord - floor(coord) )*60;
-    *min = (int) floor(tmp);
-    tmp = ( tmp - floor(tmp) )*60;
-    *sec = (int) floor(tmp);
+    const int sign = coord < 0 ? -1 : 1;
+    const double absCoord = fabs(coord);
+    const double flooredAbsCoord = floor(absCoord);
 
-    if( *sec >= 60 ) {
+    *deg = roundToNearest(flooredAbsCoord)*sign;
+
+    const double minutes = (absCoord - flooredAbsCoord)*60;
+    *min = roundToNearest(floor(minutes));
+
+    const double seconds = (minutes - *min)*60;
+    *sec = roundToNearest(seconds);
+
+    if ( *sec >= 60 )
+    {
         *sec = 0;
         *min += 1;
     }
 
-    if( *min >= 60 ) {
+    if ( *min >= 60 )
+    {
         *min = 0;
-        *deg += 1;
+        *deg += sign;
     }
 
     LOG_FUNCTION_NAME_EXIT
