@@ -2,6 +2,23 @@ ifdef BOARD_USES_TI_CAMERA_HAL
 
 ifeq ($(TARGET_BOARD_PLATFORM),omap4)
 
+ifdef TI_CAMERAHAL_DEBUG_ENABLED
+    # Enable CameraHAL debug logs
+    CAMERAHAL_CFLAGS += -DCAMERAHAL_DEBUG
+endif
+
+ifdef TI_CAMERAHAL_VERBOSE_DEBUG_ENABLED
+    # Enable CameraHAL verbose debug logs
+    CAMERAHAL_CFLAGS += -DCAMERAHAL_DEBUG_VERBOSE
+endif
+
+ifdef TI_CAMERAHAL_DEBUG_FUNCTION_NAMES
+    # Enable CameraHAL function enter/exit logging
+    CAMERAHAL_CFLAGS += -DTI_FUNCTION_LOGGER_ENABLE
+endif
+
+CAMERAHAL_CFLAGS += -DLOG_TAG=\"CameraHal\"
+
 ################################################
 
 #Camera HAL
@@ -51,7 +68,7 @@ LOCAL_C_INCLUDES += \
 	hardware/ti/omap3/libtiutils \
 	frameworks/base/include/utils \
 
-LOCAL_CFLAGS += -fno-short-enums -DCOPY_IMAGE_BUFFER -DTARGET_OMAP4 -mfpu=neon
+LOCAL_CFLAGS += -fno-short-enums -DCOPY_IMAGE_BUFFER -DTARGET_OMAP4 -mfpu=neon $(CAMERAHAL_CFLAGS)
 
 LOCAL_MODULE:= libcamera
 LOCAL_MODULE_TAGS:= optional
@@ -94,7 +111,7 @@ LOCAL_C_INCLUDES += \
 	frameworks/base/include/utils \
 	$(LOCAL_PATH)/../../../../../external/libxml2/include \
 
-LOCAL_CFLAGS += -fno-short-enums -DTARGET_OMAP4
+LOCAL_CFLAGS += -fno-short-enums -DTARGET_OMAP4 $(CAMERAHAL_CFLAGS)
 
 LOCAL_MODULE:= libfakecameraadapter
 LOCAL_MODULE_TAGS:= optional
@@ -149,7 +166,7 @@ LOCAL_C_INCLUDES += \
 
 
 
-LOCAL_CFLAGS += -fno-short-enums -DTARGET_OMAP4
+LOCAL_CFLAGS += -fno-short-enums -DTARGET_OMAP4 $(CAMERAHAL_CFLAGS)
 
 LOCAL_MODULE:= libomxcameraadapter
 LOCAL_MODULE_TAGS:= optional
@@ -201,7 +218,7 @@ LOCAL_C_INCLUDES += \
 
 
 
-LOCAL_CFLAGS += -fno-short-enums -DTARGET_OMAP4
+LOCAL_CFLAGS += -fno-short-enums -DTARGET_OMAP4 $(CAMERAHAL_CFLAGS)
 
 LOCAL_MODULE:= libusbcameraadapter
 LOCAL_MODULE_TAGS := optional

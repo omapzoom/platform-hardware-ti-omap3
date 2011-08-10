@@ -51,10 +51,6 @@ static int mDebugFps = 0;
 
 namespace android {
 
-#undef LOG_TAG
-///Maintain a separate tag for V4LCameraAdapter logs to isolate issues OMX specific
-#define LOG_TAG "V4LCameraAdapter"
-
 //frames skipped before recalculating the framerate
 #define FPS_PERIOD 30
 
@@ -437,6 +433,8 @@ status_t V4LCameraAdapter::setTimeOut(unsigned int sec)
 //by camera service when VSTAB/VNF is turned ON for example
 void V4LCameraAdapter::getFrameSize(int &width, int &height)
 {
+    LOG_FUNCTION_NAME
+
     // Just return the current preview size, nothing more to do here.
     mParams.getPreviewSize(&width, &height);
 

@@ -20,7 +20,6 @@
 
 
 
-#define LOG_TAG "CameraParams"
 #include <utils/Log.h>
 
 #include <string.h>

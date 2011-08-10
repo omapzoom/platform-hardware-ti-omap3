@@ -72,37 +72,38 @@
 //Enables Absolute PPM measurements in logcat
 #define PPM_INSTRUMENTATION_ABS 1
 
-//Uncomment to enable more verbose/debug logs
-//#define DEBUG_LOG
-
-///Camera HAL Logging Functions
-#ifndef DEBUG_LOG
-
-#define CAMHAL_LOGDA(str)
-#define CAMHAL_LOGDB(str, ...)
-#define CAMHAL_LOGVA(str)
-#define CAMHAL_LOGVB(str, ...)
-
-
-#undef LOG_FUNCTION_NAME
-#undef LOG_FUNCTION_NAME_EXIT
-#define LOG_FUNCTION_NAME
-#define LOG_FUNCTION_NAME_EXIT
-
+// Camera HAL Logging Functions
+#ifdef CAMERAHAL_DEBUG
+#   define CAMHAL_LOGD  DBGUTILS_LOGD
+#   define CAMHAL_LOGDA DBGUTILS_LOGDA
+#   define CAMHAL_LOGDB DBGUTILS_LOGDB
+#   ifdef CAMERAHAL_DEBUG_VERBOSE
+#       define CAMHAL_LOGV  DBGUTILS_LOGV
+#       define CAMHAL_LOGVA DBGUTILS_LOGVA
+#       define CAMHAL_LOGVB DBGUTILS_LOGVB
+#   else
+#       define CAMHAL_LOGV(...)
+#       define CAMHAL_LOGVA(str)
+#       define CAMHAL_LOGVB(str, ...)
+#   endif
 #else
-
-#define CAMHAL_LOGDA DBGUTILS_LOGDA
-#define CAMHAL_LOGDB DBGUTILS_LOGDB
-#define CAMHAL_LOGVA DBGUTILS_LOGVA
-#define CAMHAL_LOGVB DBGUTILS_LOGVB
-
-
+#   define CAMHAL_LOGD(...)
+#   define CAMHAL_LOGDA(str)
+#   define CAMHAL_LOGDB(str, ...)
+#   define CAMHAL_LOGV(...)
+#   define CAMHAL_LOGVA(str)
+#   define CAMHAL_LOGVB(str, ...)
 #endif
 
+#define CAMHAL_LOGE  DBGUTILS_LOGE
 #define CAMHAL_LOGEA DBGUTILS_LOGEA
 #define CAMHAL_LOGEB DBGUTILS_LOGEB
+#define CAMHAL_LOGF  DBGUTILS_LOGF
 
+#define CAMHAL_ASSERT DBGUTILS_ASSERT
+#define CAMHAL_ASSERT_X DBGUTILS_ASSERT_X
 
+#define CAMHAL_UNUSED(x) (void)x
 
 #define NONNEG_ASSIGN(x,y) \
     if(x > -1) \

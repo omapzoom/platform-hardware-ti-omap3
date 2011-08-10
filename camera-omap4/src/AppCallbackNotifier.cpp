@@ -18,11 +18,6 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-
-
-#define LOG_TAG "CameraHal"
-
-
 #include "CameraHal.h"
 
 
@@ -1123,7 +1118,7 @@ status_t AppCallbackNotifier::startPreviewCallbacks(CameraParameters &params, vo
 
     mPreviewing = true;
 
-    LOG_FUNCTION_NAME
+    LOG_FUNCTION_NAME_EXIT
 
     exit:
 

@@ -53,10 +53,6 @@ static int mDebugFps = 0;
 
 namespace android {
 
-#undef LOG_TAG
-///Maintain a separate tag for OMXCameraAdapter logs to isolate issues OMX specific
-#define LOG_TAG "OMXCameraAdapter"
-
 //frames skipped before recalculating the framerate
 #define FPS_PERIOD 30
 
@@ -2576,6 +2572,8 @@ status_t OMXCameraAdapter::enableVideoNoiseFilter(bool enable)
 
 status_t OMXCameraAdapter::flushBuffers()
 {
+    LOG_FUNCTION_NAME
+
     status_t ret = NO_ERROR;
     OMX_ERRORTYPE eError = OMX_ErrorNone;
     TIMM_OSAL_ERRORTYPE err;
@@ -2590,9 +2588,6 @@ status_t OMXCameraAdapter::flushBuffers()
         LOG_FUNCTION_NAME_EXIT
         return ret;
         }
-
-    LOG_FUNCTION_NAME
-
 
     OMXCameraPortParameters * mPreviewData = NULL;
     mPreviewData = &mCameraAdapterParameters.mCameraPortParams[mCameraAdapterParameters.mPrevPortIndex];
@@ -5548,7 +5543,7 @@ status_t OMXCameraAdapter::autoFocus()
     msg.command = CommandHandler::CAMERA_PERFORM_AUTOFOCUS;
     mCommandHandler->put(&msg);
 
-    LOG_FUNCTION_NAME
+    LOG_FUNCTION_NAME_EXIT
 
     return ret;
 }

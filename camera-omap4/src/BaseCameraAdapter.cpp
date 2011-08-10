@@ -18,9 +18,6 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-
-#define LOG_TAG "CameraHal"
-
 #include "BaseCameraAdapter.h"
 
 namespace android {
@@ -603,7 +600,7 @@ status_t BaseCameraAdapter::notifyShutterSubscribers()
             }
         }
 
-    LOG_FUNCTION_NAME
+    LOG_FUNCTION_NAME_EXIT
 
     return ret;
 }

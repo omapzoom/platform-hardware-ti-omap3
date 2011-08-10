@@ -19,8 +19,6 @@
  */
 
 
-#define LOG_TAG "CameraHal"
-
 #include "FakeCameraAdapter.h"
 
 namespace android {

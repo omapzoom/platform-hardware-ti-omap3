@@ -24,9 +24,6 @@
 *
 */
 
-#define LOG_TAG "CameraHal"
-
-
 #include "CameraHal.h"
 
 namespace android {

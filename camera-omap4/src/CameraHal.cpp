@@ -24,8 +24,6 @@
 *
 */
 
-#define LOG_TAG "CameraHal"
-
 #include "CameraHal.h"
 #include "OverlayDisplayAdapter.h"
 #include "TICameraParameters.h"
@@ -1087,7 +1085,7 @@ status_t CameraHal::allocPreviewDataBufs(size_t size, size_t bufferCount)
         mPreviewDataOffsets = NULL;
         }
 
-    LOG_FUNCTION_NAME
+    LOG_FUNCTION_NAME_EXIT
 
     return ret;
 }
@@ -1169,7 +1167,7 @@ status_t CameraHal::allocImageBufs(unsigned int width, unsigned int height, size
         mImageOffsets = NULL;
         }
 
-    LOG_FUNCTION_NAME
+    LOG_FUNCTION_NAME_EXIT
 
     return ret;
 }
@@ -1589,7 +1587,7 @@ status_t CameraHal::setOverlay(const sp<Overlay> &overlay)
         if(ret!=NO_ERROR)
             {
             mDisplayAdapter.clear();
-            CAMHAL_LOGEA("DisplayAdapter initialize failed")
+            CAMHAL_LOGEA("DisplayAdapter initialize failed");
             LOG_FUNCTION_NAME_EXIT
             return ret;
             }

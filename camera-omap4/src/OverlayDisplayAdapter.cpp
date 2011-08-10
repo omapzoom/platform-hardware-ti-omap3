@@ -20,8 +20,6 @@
 
 
 
-#define LOG_TAG "OverlayDisplayAdapter"
-
 #include "OverlayDisplayAdapter.h"
 #include "overlay_common.h"
 

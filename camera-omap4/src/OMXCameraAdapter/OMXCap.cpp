@@ -31,11 +31,6 @@
 
 namespace android {
 
-#undef LOG_TAG
-
-///Maintain a separate tag for OMXCameraAdapter logs to isolate issues OMX specific
-#define LOG_TAG "OMXCameraAdapter"
-
 const char PARAM_SEP[] = ",";
 const uint32_t VFR_OFFSET = 8;
 const char VFR_BACKET_START[] = "(";
@@ -448,7 +443,7 @@ status_t OMXCameraAdapter::insertImageSizes(CameraParameters &params, OMX_TI_CAP
             }
         }
 
-    LOG_FUNCTION_NAME
+    LOG_FUNCTION_NAME_EXIT
 
     return ret;
 }
@@ -478,7 +473,7 @@ status_t OMXCameraAdapter::insertPreviewSizes(CameraParameters &params, OMX_TI_C
             }
         }
 
-    LOG_FUNCTION_NAME
+    LOG_FUNCTION_NAME_EXIT
 
     return ret;
 }
@@ -510,7 +505,7 @@ status_t OMXCameraAdapter::insertThumbSizes(CameraParameters &params, OMX_TI_CAP
             }
         }
 
-    LOG_FUNCTION_NAME
+    LOG_FUNCTION_NAME_EXIT
 
     return ret;
 }
@@ -544,7 +539,7 @@ status_t OMXCameraAdapter::insertZoomStages(CameraParameters &params, OMX_TI_CAP
             }
         }
 
-    LOG_FUNCTION_NAME
+    LOG_FUNCTION_NAME_EXIT
 
     return ret;
 }
@@ -581,7 +576,7 @@ status_t OMXCameraAdapter::insertImageFormats(CameraParameters &params, OMX_TI_C
             }
         }
 
-    LOG_FUNCTION_NAME
+    LOG_FUNCTION_NAME_EXIT
 
     return ret;
 }
@@ -616,7 +611,7 @@ status_t OMXCameraAdapter::insertPreviewFormats(CameraParameters &params, OMX_TI
             }
         }
 
-    LOG_FUNCTION_NAME
+    LOG_FUNCTION_NAME_EXIT
 
     return ret;
 }
@@ -649,7 +644,7 @@ status_t OMXCameraAdapter::insertFramerates(CameraParameters &params, OMX_TI_CAP
             }
         }
 
-    LOG_FUNCTION_NAME
+    LOG_FUNCTION_NAME_EXIT
 
     return ret;
 }
@@ -679,7 +674,7 @@ status_t OMXCameraAdapter::insertVFramerates(CameraParameters &params, OMX_TI_CA
             }
         }
 
-    LOG_FUNCTION_NAME
+    LOG_FUNCTION_NAME_EXIT
 
     return ret;
 }
@@ -702,7 +697,7 @@ status_t OMXCameraAdapter::insertEVs(CameraParameters &params, OMX_TI_CAPTYPE &c
         params.set(CameraParameters::KEY_MAX_EXPOSURE_COMPENSATION, supported);
         }
 
-    LOG_FUNCTION_NAME
+    LOG_FUNCTION_NAME_EXIT
 
     return ret;
 }
@@ -732,7 +727,7 @@ status_t OMXCameraAdapter::insertISOModes(CameraParameters &params, OMX_TI_CAPTY
             }
         }
 
-    LOG_FUNCTION_NAME
+    LOG_FUNCTION_NAME_EXIT
 
     return ret;
 }
@@ -774,7 +769,7 @@ status_t OMXCameraAdapter::insertIPPModes(CameraParameters &params, OMX_TI_CAPTY
         params.set(TICameraParameters::KEY_SUPPORTED_IPP, supported);
         }
 
-    LOG_FUNCTION_NAME
+    LOG_FUNCTION_NAME_EXIT
 
     return ret;
 }
@@ -807,7 +802,7 @@ status_t OMXCameraAdapter::insertWBModes(CameraParameters &params, OMX_TI_CAPTYP
         params.set(CameraParameters::KEY_SUPPORTED_WHITE_BALANCE, supported);
         }
 
-    LOG_FUNCTION_NAME
+    LOG_FUNCTION_NAME_EXIT
 
     return ret;
 }
@@ -837,7 +832,7 @@ status_t OMXCameraAdapter::insertEffects(CameraParameters &params, OMX_TI_CAPTYP
         params.set(CameraParameters::KEY_SUPPORTED_EFFECTS, supported);
         }
 
-    LOG_FUNCTION_NAME
+    LOG_FUNCTION_NAME_EXIT
 
     return ret;
 }
@@ -875,7 +870,7 @@ status_t OMXCameraAdapter::insertExpModes(CameraParameters &params, OMX_TI_CAPTY
         params.set(TICameraParameters::KEY_SUPPORTED_EXPOSURE, supported);
         }
 
-    LOG_FUNCTION_NAME
+    LOG_FUNCTION_NAME_EXIT
 
     return ret;
 }
@@ -905,7 +900,7 @@ status_t OMXCameraAdapter::insertSceneModes(CameraParameters &params, OMX_TI_CAP
         params.set(CameraParameters::KEY_SUPPORTED_SCENE_MODES, supported);
         }
 
-    LOG_FUNCTION_NAME
+    LOG_FUNCTION_NAME_EXIT
 
     return ret;
 }
@@ -940,7 +935,7 @@ status_t OMXCameraAdapter::insertFocusModes(CameraParameters &params, OMX_TI_CAP
         params.set(CameraParameters::KEY_SUPPORTED_FOCUS_MODES, supported);
         }
 
-    LOG_FUNCTION_NAME
+    LOG_FUNCTION_NAME_EXIT
 
     return ret;
 }
@@ -970,7 +965,7 @@ status_t OMXCameraAdapter::insertFlickerModes(CameraParameters &params, OMX_TI_C
         params.set(CameraParameters::KEY_SUPPORTED_ANTIBANDING, supported);
         }
 
-    LOG_FUNCTION_NAME
+    LOG_FUNCTION_NAME_EXIT
 
     return ret;
 }
