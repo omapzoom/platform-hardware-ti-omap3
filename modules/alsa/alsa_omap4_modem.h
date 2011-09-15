@@ -272,6 +272,25 @@ static const int recordTypeValueLen = (sizeof(recordTypeValue) / sizeof(char *))
 #define AUDIO_MODEM_PCM_HANDLE_NAME    "hw:0,5"
 #define AUDIO_MODEM_PCM_LATENCY     500000
 
+// Define priority order per device connection
+// This is needed in case multipple device are connected
+// lower value is the higher priority
+// device can't have the same priority
+#ifdef AUDIO_BLUETOOTH
+#define AUDIO_MODEM_DEVICE_BLUETOOTH_PRIORITY    0
+#define AUDIO_MODEM_DEVICE_HEADSET_PRIORITY      1
+#define AUDIO_MODEM_DEVICE_HANDSET_PRIORITY      2
+#define AUDIO_MODEM_DEVICE_HANDFREE_PRIORITY     3
+#define AUDIO_MODEM_MAX_DEVICE    4
+#else
+#define AUDIO_MODEM_DEVICE_HEADSET_PRIORITY      0
+#define AUDIO_MODEM_DEVICE_HANDSET_PRIORITY      1
+#define AUDIO_MODEM_DEVICE_HANDFREE_PRIORITY     2
+#define AUDIO_MODEM_MAX_DEVICE    3
+
+#endif
+
+
 // Voice Call Volume
 struct voiceCallVolumeInfo
 {
@@ -421,6 +440,9 @@ public:
 
     // Automatic sample rate
     uint32_t mVoiceCallSampleRate;
+
+    // Audio device priority
+    uint32_t mAudioDevicePriority[AUDIO_MODEM_MAX_DEVICE];
 };
 };        // namespace android
 #endif    // ANDROID_ALSA_OMAP4_MODEM_H
