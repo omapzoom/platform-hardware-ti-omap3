@@ -58,6 +58,7 @@ extern "C" {
 
 
 static pthread_t thermalDaemonThrd;
+static pthread_t thermalDaemonThrdMon;
 static int fd;
 static int cpu_state;
 static int pcb_state;
@@ -215,10 +216,22 @@ pcb_check:
     return;
 }
 
+static void ThermalDaemonTempMonitoring(void)
+{
+    int average_period;
+
+    while (1) {
+        average_period = thermal_manager_monitoring(OMAP_CPU);
+        usleep(average_period);
+    }
+    return;
+}
+
 static void signal_handler(int sig)
 {
     LOGD("Thermal Daemon: Thermal daemon is exiting...\n");
     pthread_exit(&thermalDaemonThrd);
+    pthread_exit(&thermalDaemonThrdMon);
     exit(0);
 }
 
@@ -256,9 +269,23 @@ int main(int argc, char * argv [])
         exit(1);
     }
 
+    LOGD("Spawning Thermal Daemon Monitoring thread...\n");
+    status = pthread_create(&thermalDaemonThrdMon, NULL,
+        (void *)&ThermalDaemonTempMonitoring, NULL);
+    if (status) {
+        LOGD("Thermal Daemon Monitoring thread failed to be created %i\n", status);
+        exit(1);
+    }
+
     status = pthread_join(thermalDaemonThrd, NULL);
     if (status) {
         LOGD("Thermal Daemon join failed to be created %i\n", status);
+        exit(1);
+    }
+
+    status = pthread_join(thermalDaemonThrdMon, NULL);
+    if (status) {
+        LOGD("Thermal Daemon Monitoring join failed to be created %i\n", status);
         exit(1);
     }
 

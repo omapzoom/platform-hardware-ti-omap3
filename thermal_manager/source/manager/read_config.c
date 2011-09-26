@@ -63,6 +63,7 @@ int read_config(void)
     const char *duty_cycle_read[MAX_DUTY_CYCLE_PATHS];
     const char *omap_cpu_id;
     const char *omap_pcb_id;
+    const char *pcb_temp_sensor_type;
     long value;
     int val_bool;
     const config_setting_t *list;
@@ -129,6 +130,21 @@ int read_config(void)
 
     if (config_lookup_int(cf, "omap_cpu_temperature_offset", &value)) {
         config_file.omap_cpu_temperature_offset = value;
+    }
+
+    if (config_lookup_bool(cf, "pcb_temp_sensor_used_for_omap", &val_bool)) {
+        config_file.pcb_temp_sensor_used = value;
+    }
+
+    if (config_lookup_string(cf, "pcb_temp_sensor_type_for_omap", &pcb_temp_sensor_type)) {
+        if ((config_file.pcb_temp_sensor_type =
+            calloc(strlen(pcb_temp_sensor_type), sizeof(char))) == NULL) {
+                LOGD("Error in allocating memory\n");
+                return -1;
+        }
+        strcpy (config_file.pcb_temp_sensor_type, pcb_temp_sensor_type);
+    } else {
+        config_file.pcb_temp_sensor_type = "undefined";
     }
 
     if (config_lookup_int(cf, "pcb_threshold", &value)) {
@@ -293,6 +309,10 @@ int read_config(void)
         LOGD("config_file.pcb_sections[%d].duty_cycle_params.nitro_percentage %u\n",
          index, config_file.pcb_sections[index].duty_cycle_params.nitro_percentage);
     }
+    LOGD("config_file.pcb_temp_sensor_used_for_omap %d",
+          config_file.pcb_temp_sensor_used);
+    LOGD("config_file.pcb_temp_sensor_type_for_omap %s",
+          config_file.pcb_temp_sensor_type);
 #endif
     return 0;
 }
