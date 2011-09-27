@@ -101,7 +101,6 @@ public:
 protected:
 
 //----------Parent class method implementation------------------------------------
-    virtual status_t setTimeOut(unsigned int sec);
     virtual status_t startPreview();
     virtual status_t stopPreview();
     virtual status_t useBuffers(CameraMode mode, void* bufArr, int num, size_t length);

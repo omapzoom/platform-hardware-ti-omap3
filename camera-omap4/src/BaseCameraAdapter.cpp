@@ -58,6 +58,21 @@ BaseCameraAdapter::BaseCameraAdapter()
 
 }
 
+BaseCameraAdapter::~BaseCameraAdapter()
+{
+    LOG_FUNCTION_NAME
+
+    Mutex::Autolock lock(mSubscriberLock);
+
+    mFrameSubscribers.clear();
+    mImageSubscribers.clear();
+    mRawSubscribers.clear();
+    mVideoSubscribers.clear();
+    mFocusSubscribers.clear();
+    mShutterSubscribers.clear();
+    mZoomSubscribers.clear();
+}
+
 status_t BaseCameraAdapter::registerImageReleaseCallback(release_image_buffers_callback callback, void *user_data)
 {
     status_t ret = NO_ERROR;
@@ -421,18 +436,6 @@ status_t BaseCameraAdapter::sendCommand(int operation, int value1, int value2, i
             {
             CAMHAL_LOGDA("Stop video recording");
             stopVideoCapture();
-            break;
-            }
-        case CameraAdapter::CAMERA_SET_TIMEOUT:
-            {
-            CAMHAL_LOGDA("Set time out");
-            setTimeOut(value1);
-            break;
-            }
-        case CameraAdapter::CAMERA_CANCEL_TIMEOUT:
-            {
-            CAMHAL_LOGDA("Cancel time out");
-            cancelTimeOut();
             break;
             }
         case CameraAdapter::CAMERA_PREVIEW_FLUSH_BUFFERS:
@@ -846,28 +849,6 @@ void BaseCameraAdapter::setFrameRefCount(void* frameBuf, CameraFrame::FrameType 
 
 }
 
-status_t BaseCameraAdapter::setTimeOut(int sec)
-{
-    status_t ret = NO_ERROR;
-
-    LOG_FUNCTION_NAME
-
-    //Subscriptions are also invalid
-    Mutex::Autolock lock(mSubscriberLock);
-
-    mFrameSubscribers.clear();
-    mImageSubscribers.clear();
-    mRawSubscribers.clear();
-    mVideoSubscribers.clear();
-    mFocusSubscribers.clear();
-    mShutterSubscribers.clear();
-    mZoomSubscribers.clear();
-
-    LOG_FUNCTION_NAME_EXIT
-
-    return ret;
-}
-
 status_t BaseCameraAdapter::startVideoCapture()
 {
     status_t ret = NO_ERROR;
@@ -991,17 +972,6 @@ status_t BaseCameraAdapter::autoFocus()
 }
 
 status_t BaseCameraAdapter::cancelAutoFocus()
-{
-    status_t ret = NO_ERROR;
-
-    LOG_FUNCTION_NAME
-
-    LOG_FUNCTION_NAME_EXIT
-
-    return ret;
-}
-
-status_t BaseCameraAdapter::cancelTimeOut()
 {
     status_t ret = NO_ERROR;
 

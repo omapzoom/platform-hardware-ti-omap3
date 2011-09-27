@@ -396,8 +396,6 @@ protected:
     virtual status_t stopBracketing();
     virtual status_t autoFocus();
     virtual status_t cancelAutoFocus();
-    virtual status_t setTimeOut(int sec);
-    virtual status_t cancelTimeOut();
     virtual status_t startSmoothZoom(int targetIdx);
     virtual status_t stopSmoothZoom();
     virtual status_t startVideoCapture();

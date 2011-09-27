@@ -54,8 +54,6 @@ namespace android {
 //frames skipped before recalculating the framerate
 #define FPS_PERIOD 30
 
-static V4LCameraAdapter *gCameraAdapter = NULL;
-Mutex gAdapterLock;
 const char *device = DEVICE;
 
 
@@ -419,16 +417,6 @@ char * V4LCameraAdapter::GetFrame(int &index)
     return (char *)mVideoInfo->mem[mVideoInfo->buf.index];
 }
 
-status_t V4LCameraAdapter::setTimeOut(unsigned int sec)
-{
-    status_t ret = NO_ERROR;
-
-    gCameraAdapter = NULL;
-    delete this;
-
-    return ret;
-}
-
 //API to get the frame size required to be allocated. This size is used to override the size passed
 //by camera service when VSTAB/VNF is turned ON for example
 void V4LCameraAdapter::getFrameSize(int &width, int &height)
@@ -583,24 +571,20 @@ int V4LCameraAdapter::previewThread()
 
 extern "C" CameraAdapter* CameraAdapter_Factory()
 {
-    Mutex::Autolock lock(gAdapterLock);
-
     LOG_FUNCTION_NAME
 
-    if ( NULL == gCameraAdapter )
-        {
-        CAMHAL_LOGDA("Creating new Camera adapter instance");
-        gCameraAdapter= new V4LCameraAdapter();
-        }
-    else
-        {
-        CAMHAL_LOGDA("Reusing existing Camera adapter instance");
-        }
+    CameraAdapter * const cameraAdapter = new V4LCameraAdapter();
 
+    if ( !cameraAdapter) {
+        CAMHAL_LOGEA("Failed to create new V4L2 Camera adapter instance");
+        return NULL;
+    }
+
+    CAMHAL_LOGDA("New V4LCameraAdapter instance created");
 
     LOG_FUNCTION_NAME_EXIT
 
-    return gCameraAdapter;
+    return cameraAdapter;
 }
 
 };

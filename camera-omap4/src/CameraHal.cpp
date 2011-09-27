@@ -35,8 +35,6 @@
 #include <poll.h>
 #include <math.h>
 
-#define ADAPTER_TIMEOUT 5 //[s.]
-
 ///@remarks added for testing purposes
 
 namespace android {
@@ -2489,9 +2487,6 @@ CameraHal::~CameraHal()
 
     bool deleteProperties = true;
 
-    ///Call de-initialize here once more - it is the last chance for us to relinquish all the h/w and s/w resources
-    deinitialize();
-
     singleton[mCameraIndex].clear();
 
     // check to see if we are the last open instance of camerahal
@@ -2588,7 +2583,6 @@ if(!mCameraPropertiesArr)
         CAMHAL_LOGEA("Unable to create or initialize CameraAdapter");
         goto fail_loop;
         }
-    mCameraAdapter->sendCommand(CameraAdapter::CAMERA_CANCEL_TIMEOUT);
     mCameraAdapter->registerImageReleaseCallback(releaseImageBuffers, (void *) this);
     mCameraAdapter->registerEndCaptureCallback(endImageCapture, (void *)this);
 
@@ -3326,12 +3320,15 @@ void CameraHal::deinitialize()
 
     if ( NULL != mCameraAdapter )
         {
-        mCameraAdapter->sendCommand(CameraAdapter::CAMERA_SET_TIMEOUT, ADAPTER_TIMEOUT);
+        delete mCameraAdapter;
         mCameraAdapter = NULL;
         }
 
-    ///We dont close the camera adapter DLL here inorder to improve performance
-    //::dlclose(mCameraAdapterHandle);
+    if ( mCameraAdapterHandle )
+    {
+        ::dlclose(mCameraAdapterHandle);
+        mCameraAdapterHandle = NULL;
+    }
 
     LOG_FUNCTION_NAME_EXIT
 

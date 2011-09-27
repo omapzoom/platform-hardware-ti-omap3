@@ -56,35 +56,6 @@ namespace android {
 //frames skipped before recalculating the framerate
 #define FPS_PERIOD 30
 
-static OMXCameraAdapter *gCameraAdapter = NULL;
-Mutex gAdapterLock;
-
-//Signal handler
-static void SigHandler(int sig)
-{
-    Mutex::Autolock lock(gAdapterLock);
-
-    if ( SIGTERM == sig )
-        {
-        CAMHAL_LOGDA("SIGTERM has been received");
-        if ( NULL != gCameraAdapter )
-            {
-            delete gCameraAdapter;
-            gCameraAdapter = NULL;
-            }
-        exit(0);
-        }
-    else if (SIGALRM == sig)
-        {
-        CAMHAL_LOGDA("SIGALRM has been received");
-        if ( NULL != gCameraAdapter )
-            {
-            delete gCameraAdapter;
-            gCameraAdapter = NULL;
-            }
-        }
-}
-
 /*--------------------Camera Adapter Class STARTS here-----------------------------*/
 
 const char OMXCameraAdapter::EXIFASCIIPrefix [] = { 0x41, 0x53, 0x43, 0x49, 0x49, 0x0, 0x0, 0x0 };
@@ -3812,44 +3783,6 @@ int OMXCameraAdapter::fseekDCCuseCasePos(FILE *pFile)
     }
 
     return 0;
-}
-
-status_t OMXCameraAdapter::setTimeOut(int sec)
-{
-    status_t ret = NO_ERROR;
-
-    LOG_FUNCTION_NAME
-
-    if( mComponentState == OMX_StateInvalid)
-      {
-        delete this;
-        gCameraAdapter = NULL;
-        return 0;
-      }
-    else
-      {
-      switchToLoaded();
-      ret = alarm(sec);
-      }
-    //At this point ErrorNotifier becomes invalid
-    mErrorNotifier = NULL;
-
-    LOG_FUNCTION_NAME_EXIT
-
-    return BaseCameraAdapter::setTimeOut(sec);
-}
-
-status_t OMXCameraAdapter::cancelTimeOut()
-{
-    status_t ret = NO_ERROR;
-
-    LOG_FUNCTION_NAME
-
-    ret = alarm(0);
-
-    LOG_FUNCTION_NAME_EXIT
-
-    return ret;
 }
 
 status_t OMXCameraAdapter::setThumbnailParams(unsigned int width, unsigned int height, unsigned int quality)
@@ -7841,8 +7774,6 @@ OMXCameraAdapter::OMXCameraAdapter():mComponentState (OMX_StateInvalid)
     onlyOnce = true;
 
     mCameraAdapterParameters.mHandleComp = 0;
-    signal(SIGTERM, SigHandler);
-    signal(SIGALRM, SigHandler);
 
     LOG_FUNCTION_NAME_EXIT
 }
@@ -7850,6 +7781,8 @@ OMXCameraAdapter::OMXCameraAdapter():mComponentState (OMX_StateInvalid)
 OMXCameraAdapter::~OMXCameraAdapter()
 {
     LOG_FUNCTION_NAME
+
+    switchToLoaded();
 
     if (mSMALCDataRecord)
         free (mSMALCDataRecord);
@@ -7883,24 +7816,21 @@ OMXCameraAdapter::~OMXCameraAdapter()
 
 extern "C" CameraAdapter* CameraAdapter_Factory()
 {
-    Mutex::Autolock lock(gAdapterLock);
-
     LOG_FUNCTION_NAME
 
-    if ( NULL == gCameraAdapter )
-        {
-        CAMHAL_LOGDA("Creating new Camera adapter instance");
-        gCameraAdapter= new OMXCameraAdapter();
-        }
-    else
-        {
-        CAMHAL_LOGDA("Reusing existing Camera adapter instance");
-        }
+    CameraAdapter * cameraAdapter = new OMXCameraAdapter();
 
+    if ( !cameraAdapter )
+    {
+        CAMHAL_LOGEA("Failed to instantiate OMX Camera adapter");
+        return NULL;
+    }
+
+    CAMHAL_LOGDA("New OMXCameraAdapter instance created");
 
     LOG_FUNCTION_NAME_EXIT
 
-    return gCameraAdapter;
+    return cameraAdapter;
 }
 
 };

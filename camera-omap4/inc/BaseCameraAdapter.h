@@ -32,6 +32,7 @@ class BaseCameraAdapter : public CameraAdapter
 public:
 
     BaseCameraAdapter();
+    ~BaseCameraAdapter();
 
     ///Initialzes the camera adapter creates any resources required
     virtual status_t initialize(int sensor_index = 0) = 0;
@@ -92,12 +93,6 @@ protected:
 
     //Should be implemented by deriving classes in oder to initiate autoFocus
     virtual status_t cancelAutoFocus();
-
-    //Should be called by deriving classes in order to deinit base class
-    virtual status_t setTimeOut(int sec);
-
-    //Should be called by deriving classes in order to cancel deinit timeout
-    virtual status_t cancelTimeOut();
 
     //Should be called by deriving classes in order to do some bookkeeping
     virtual status_t startVideoCapture();
