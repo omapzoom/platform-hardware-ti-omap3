@@ -22,17 +22,18 @@
  * Global Variables (CPU Freq parameters)
  *
  */
-u32 available_freq[OPPS_NUMBER];
-bool is_panic_zone_reached = false;
-u32 nominal_cpu_scaling_max_freq;
-char *available_governors[GOVS_NUMBER];
-char *nominal_cpu_scaling_governor;
-bool is_conservative_available = false;
-u32 update_rate = 0;
-u32 current_scaling_max_freq = 0;
-u32 current_t_high = 0; /* temperature threshold (high) at OMAP hot spot level */
-u32 current_t_low = 0;  /* temperature threshold (low) at OMAP hot spot level */
-int cpu_temp;
+static u32 available_freq[OPPS_NUMBER];
+static bool is_panic_zone_reached = false;
+static u32 nominal_cpu_scaling_max_freq;
+static char *available_governors[GOVS_NUMBER];
+static char *nominal_cpu_scaling_governor;
+static bool is_conservative_available = false;
+static u32 update_rate = 0;
+static u32 current_scaling_max_freq = 0;
+static int current_t_high = 0; /* temperature threshold (high) at OMAP hot spot level */
+static int current_t_low = 0;  /* temperature threshold (low) at OMAP hot spot level */
+static int cpu_temp = 0; /* Temperature at OMAP hot spot level */
+static int absolute_delta = 0;
 
 #define DEBUG 1
 
@@ -50,16 +51,15 @@ int cpu_temp;
  * file to avoid using floating values.
  * Note: The "offset" is defined in milli-celsius degrees.
  */
-static inline u32 convert_omap_sensor_temp_to_hotspot_temp(u32 type, u32 sensor_temp)
+static inline int convert_omap_sensor_temp_to_hotspot_temp(u32 type, int temp)
 {
-    u32 absolute_delta;
-    u32 slope; /* multiplied by 1000 */
-    u32 constant; /* milli-celsius degrees */
+    int slope; /* multiplied by 1000 */
+    int constant; /* milli-celsius degrees */
     if (type == OMAP_CPU) {
         slope = config_file.omap_cpu_temperature_slope;
         constant = config_file.omap_cpu_temperature_offset;
-        absolute_delta = ((sensor_temp * slope / 1000) + constant);
-        return (sensor_temp + absolute_delta);
+        absolute_delta = ((temp * slope / 1000) + constant);
+        return (temp + absolute_delta);
     } else {
         return 0;
     }
@@ -75,10 +75,10 @@ static inline u32 convert_omap_sensor_temp_to_hotspot_temp(u32 type, u32 sensor_
  * file to avoid using floating values.
  * Note: the "offset" is defined in milli-celsius degrees.
  */
-static inline u32 convert_hotspot_temp_to_omap_sensor_temp(u32 type, u32 temp)
+static inline int convert_hotspot_temp_to_omap_sensor_temp(u32 type, int temp)
 {
-    u32 slope; /* multiplied by 1000 */
-    u32 constant; /* milli-celsius degrees */
+    int slope; /* multiplied by 1000 */
+    int constant; /* milli-celsius degrees */
     if (type == OMAP_CPU) {
         slope = config_file.omap_cpu_temperature_slope;
         constant = config_file.omap_cpu_temperature_offset;
@@ -139,7 +139,7 @@ static void update_t_high(u32 t_high)
 #ifdef DEBUG
     LOGD("update_t_high (%ld)\n", t_high);
 #endif
-    sprintf(buf, "%ld\n", convert_hotspot_temp_to_omap_sensor_temp(OMAP_CPU, t_high));
+    sprintf(buf, "%d\n", convert_hotspot_temp_to_omap_sensor_temp(OMAP_CPU, t_high));
     write_to_file(
         config_file.omaptemp_file_paths[OMAP_CPU_THRESHOLD_HIGH_PATH],
         buf);
@@ -152,7 +152,7 @@ static void update_t_low(u32 t_low)
 #ifdef DEBUG
     LOGD("update_t_low (%ld)\n", t_low);
 #endif
-    sprintf(buf, "%ld\n", convert_hotspot_temp_to_omap_sensor_temp(OMAP_CPU, t_low));
+    sprintf(buf, "%d\n", convert_hotspot_temp_to_omap_sensor_temp(OMAP_CPU, t_low));
     write_to_file(
         config_file.omaptemp_file_paths[OMAP_CPU_THRESHOLD_LOW_PATH],
         buf);
@@ -163,7 +163,7 @@ static void update_t_low(u32 t_low)
  * This function should ensure that high threshold is greater than low threshold
  * The sequence to change these thresholds will depend on current and next values
  */
-static void update_thresholds(u32 next_t_high, u32 next_t_low)
+static void update_thresholds(int next_t_high, int next_t_low)
 {
     /* current_t_high is the current thermal threshold (high)*/
     /* next_t_high is the next thermal threshold (high) */
@@ -238,22 +238,6 @@ static void read_cpu_scaling_governor(void)
 {
     nominal_cpu_scaling_governor =
         read_from_file(config_file.cpufreq_file_paths[SCALING_GOVERNOR_PATH]);
-
-    /*
-     * FIXME : Should be fully useless. But without this, the
-     * value of nominal_cpu_scaling_governor is not correct when used
-     */
-    if (strcmp(nominal_cpu_scaling_governor, ("hotplug")) == 0)
-        nominal_cpu_scaling_governor = "hotplug";
-    else if (strcmp(nominal_cpu_scaling_governor, ("conservative")) == 0)
-        nominal_cpu_scaling_governor = "conservative";
-    else if (strcmp(nominal_cpu_scaling_governor, ("ondemand")) == 0)
-        nominal_cpu_scaling_governor = "ondemand";
-    else if (strcmp(nominal_cpu_scaling_governor, ("userspace")) == 0)
-        nominal_cpu_scaling_governor = "userspace";
-    else if (strcmp(nominal_cpu_scaling_governor, ("performance")) == 0)
-        nominal_cpu_scaling_governor = "performance";
-
 #ifdef DEBUG
     LOGD("nominal_cpu_scaling_governor is %s\n",
         nominal_cpu_scaling_governor);
@@ -471,31 +455,28 @@ static void panic_zone(void)
     }
 
     /* Select the next lowest one from available_freq table */
-    panic_zone_cpu_freq = available_freq[i-1];
+    if (i > 0) panic_zone_cpu_freq = available_freq[i-1];
+    else panic_zone_cpu_freq = available_freq[0];
 
     if (is_conservative_available == true) {
-        governor = "conservative";
+        if ((governor = calloc(16,sizeof(char))) == NULL) {
+            LOGD("Error in allocating memory\n");
+            return;
+        }
+        strcpy(governor, "conservative");
 #ifdef DEBUG
         LOGD("conservative governor is available\n");
         fflush(stdout);
 #endif
     } else {
-        governor = read_from_file(
-            config_file.cpufreq_file_paths[SCALING_GOVERNOR_PATH]);
-        /*
-         * FIXME : Should be fully useless. But without this, the
-         * value of governor is not correct when used
-         */
-        if (strcmp(governor, ("hotplug")) == 0)
-            governor = "hotplug";
-        else if (strcmp(governor, ("conservative")) == 0)
-            governor = "conservative";
-        else if (strcmp(governor, ("ondemand")) == 0)
-            governor = "ondemand";
-        else if (strcmp(governor, ("userspace")) == 0)
-            governor = "userspace";
-        else if (strcmp(governor, ("performance")) == 0)
-            governor = "performance";
+
+        if ((governor = calloc(strlen(read_from_file(config_file.cpufreq_file_paths[SCALING_GOVERNOR_PATH])),
+                           sizeof(char))) == NULL) {
+            LOGD("Error in allocating memory\n");
+            return;
+        }
+        strcpy(governor, read_from_file(config_file.cpufreq_file_paths[SCALING_GOVERNOR_PATH]));
+
 #ifdef DEBUG
         LOGD("initial governor is %s\n", governor);
         fflush(stdout);
@@ -539,6 +520,8 @@ static void panic_zone(void)
     is_panic_zone_reached = true;
 
     print_latest_settings();
+
+    free(governor);
 }
 
 /*
@@ -568,9 +551,9 @@ static void fatal_zone(void)
  * It defines various thermal zones (safe, monitoring, alert, panic and fatal)
  * with associated thermal Thresholds including the hysteresis effect.
  */
-int cpu_thermal_governor(u32 omap_sensor_temp)
+int cpu_thermal_governor(int sensor_temp)
 {
-    cpu_temp = convert_omap_sensor_temp_to_hotspot_temp(OMAP_CPU, omap_sensor_temp);
+    cpu_temp = convert_omap_sensor_temp_to_hotspot_temp(OMAP_CPU, sensor_temp);
 
     if (cpu_temp >= OMAP_CPU_THRESHOLD_FATAL) {
         fatal_zone();
@@ -615,7 +598,7 @@ int cpu_thermal_governor(u32 omap_sensor_temp)
 /*
  * Initialize some internal parameters.
  */
-void init_cpu_thermal_governor(u32 omap_temp)
+void init_cpu_thermal_governor(int sensor_temp)
 {
     int i;
 
@@ -662,7 +645,7 @@ void init_cpu_thermal_governor(u32 omap_temp)
     /*
      * Force to initialize all temperature thresholds according to
      * the current thermal zone */
-    cpu_thermal_governor(omap_temp);
+    cpu_thermal_governor(sensor_temp);
 
 #ifdef DEBUG
     for (i = 0; i < OPPS_NUMBER; i++) {
