@@ -834,18 +834,6 @@ bool AppCallbackNotifier::processMessage()
 
     switch(msg.command)
         {
-        case NotificationThread::NOTIFIER_START:
-            {
-            CAMHAL_LOGDA("Received NOTIFIER_START command from Camera HAL");
-            mNotifierState = AppCallbackNotifier::NOTIFIER_STARTED;
-            break;
-            }
-        case NotificationThread::NOTIFIER_STOP:
-            {
-            CAMHAL_LOGDA("Received NOTIFIER_STOP command from Camera HAL");
-            mNotifierState = AppCallbackNotifier::NOTIFIER_STOPPED;
-            break;
-            }
         case NotificationThread::NOTIFIER_EXIT:
             {
             CAMHAL_LOGDA("Received NOTIFIER_EXIT command from Camera HAL");
@@ -1442,23 +1430,7 @@ status_t AppCallbackNotifier::start()
         return NO_INIT;
         }
 
-    ///Send a message to the callback notifier thread to start listening for messages
-    //Send START_DISPLAY COMMAND to display thread. Display thread will start and then wait for a message
-    Semaphore sem;
-    sem.Create();
-    Message msg;
-    msg.command = NotificationThread::NOTIFIER_START;
-
-    //Send the semaphore to signal once the command is completed
-    msg.arg1 = &sem;
-
-    ///Post the message to display thread
-    mNotificationThread->msgQ().put(&msg);
-
-    ///Wait for the ACK - implies that the thread is now started and waiting for frames
-    CAMHAL_LOGDA("Waiting for ACK from Notification thread");
-    sem.Wait();
-    CAMHAL_LOGDA("Got ACK from Notification thread");
+    mNotifierState = NOTIFIER_STARTED;
 
     LOG_FUNCTION_NAME_EXIT
 
@@ -1477,22 +1449,8 @@ status_t AppCallbackNotifier::stop()
         return ALREADY_EXISTS;
         }
 
-    ///Send a notification to the callback thread to stop sending the notifications to the
-    ///application
+    mNotifierState = NOTIFIER_STOPPED;
 
-    Semaphore sem;
-    sem.Create();
-    Message msg;
-    msg.command = NotificationThread::NOTIFIER_STOP;
-
-    //Send the semaphore to signal once the command is completed
-    msg.arg1 = &sem;
-
-    ///Post the message to display thread
-    mNotificationThread->msgQ().put(&msg);
-
-    ///Wait for the ACK for display to be disabled
-    sem.Wait();
     LOG_FUNCTION_NAME_EXIT
     return NO_ERROR;
 }

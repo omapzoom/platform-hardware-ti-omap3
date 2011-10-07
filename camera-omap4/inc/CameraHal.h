@@ -475,9 +475,7 @@ public:
     public:
         enum NotificationThreadCommands
         {
-        NOTIFIER_START,
-        NOTIFIER_STOP,
-        NOTIFIER_EXIT,
+        NOTIFIER_EXIT
         };
     public:
         NotificationThread(AppCallbackNotifier* nh)
