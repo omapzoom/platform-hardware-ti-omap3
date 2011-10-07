@@ -133,7 +133,19 @@ int read_config(void)
     }
 
     if (config_lookup_bool(cf, "pcb_temp_sensor_used_for_omap", &val_bool)) {
-        config_file.pcb_temp_sensor_used = value;
+        // If the path to PCB Temp sensor is not valid,
+        // then set pcb_temp_sensor_used as false and force slope and offset parameters
+        FILE *fp;
+        fp = fopen(config_file.temperature_file_sensors[PCB_FILE], "r");
+        if (fp == NULL) {
+            LOGD("PCB Temp sensor is not available - force some parameters to not use PCB sensor ");
+            config_file.pcb_temp_sensor_used = false;
+            config_file.omap_cpu_temperature_slope = 481;
+            config_file.omap_cpu_temperature_offset = -12945;
+        } else {
+            fclose(fp);
+            config_file.pcb_temp_sensor_used = value;
+        }
     }
 
     if (config_lookup_string(cf, "pcb_temp_sensor_type_for_omap", &pcb_temp_sensor_type)) {
