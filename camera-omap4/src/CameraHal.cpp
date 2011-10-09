@@ -1362,26 +1362,6 @@ status_t CameraHal::startPreview()
 
     mAppCallbackNotifier->startPreviewCallbacks(mParameters, mPreviewBufs, mPreviewOffsets, mPreviewFd, mPreviewLength, atoi(mCameraPropertiesArr[CameraProperties::PROP_INDEX_REQUIRED_PREVIEW_BUFS]->mPropValue));
 
-    ///Start the callback notifier
-    ret = mAppCallbackNotifier->start();
-
-    if( ALREADY_EXISTS == ret )
-        {
-        //Already running, do nothing
-        CAMHAL_LOGDA("AppCallbackNotifier already running");
-        ret = NO_ERROR;
-        }
-    else if ( NO_ERROR == ret )
-        {
-        CAMHAL_LOGDA("Started AppCallbackNotifier..");
-        mAppCallbackNotifier->setMeasurements(mMeasurementEnabled);
-        }
-    else
-        {
-        CAMHAL_LOGEA("Couldn't start AppCallbackNotifier");
-        goto error;
-        }
-
     ///Enable the display adapter if present, actual overlay enable happens when we post the buffer
     if (mDisplayAdapter.get() != NULL)
         {
@@ -1493,7 +1473,6 @@ status_t CameraHal::startPreview()
             {
             mDisplayAdapter->disableDisplay();
             }
-        mAppCallbackNotifier->stop();
         mPreviewStartInProgress = false;
         mPreviewEnabled = false;
         LOG_FUNCTION_NAME_EXIT
@@ -1692,7 +1671,6 @@ void CameraHal::stopPreview()
     if(mAppCallbackNotifier.get() != NULL)
         {
         //Stop the callback sending
-        mAppCallbackNotifier->stop();
         mAppCallbackNotifier->stopPreviewCallbacks();
         }
 
@@ -2630,14 +2608,6 @@ if(!mCameraPropertiesArr)
     ///Set it as the error handler for CameraAdapter
     mCameraAdapter->setErrorHandler(mAppCallbackNotifier.get());
 
-    ///Start the callback notifier
-    if(mAppCallbackNotifier->start() != NO_ERROR)
-      {
-        CAMHAL_LOGEA("Couldn't start AppCallbackNotifier");
-        goto fail_loop;
-      }
-
-    CAMHAL_LOGDA("Started AppCallbackNotifier..");
     mAppCallbackNotifier->setMeasurements(mMeasurementEnabled);
 
     ///Initialize default parameters

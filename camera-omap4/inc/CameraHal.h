@@ -95,7 +95,6 @@
 #   define CAMHAL_LOGVB(str, ...)
 #endif
 
-#define CAMHAL_LOGE  DBGUTILS_LOGE
 #define CAMHAL_LOGEA DBGUTILS_LOGEA
 #define CAMHAL_LOGEB DBGUTILS_LOGEB
 #define CAMHAL_LOGF  DBGUTILS_LOGF
@@ -409,25 +408,12 @@ public:
         NOTIFIER_CMD_PROCESS_ERROR
         };
 
-    enum NotifierState
-        {
-        NOTIFIER_STOPPED,
-        NOTIFIER_STARTED,
-        NOTIFIER_EXITED
-        };
-
 public:
 
     ~AppCallbackNotifier();
 
     ///Initialzes the callback notifier, creates any resources required
     status_t initialize();
-
-    ///Starts the callbacks to application
-    status_t start();
-
-    ///Stops the callbacks from going to application
-    status_t stop();
 
     void setEventProvider(int32_t eventMask, MessageNotifier * eventProvider);
     void setFrameProvider(FrameNotifier *frameProvider);
@@ -444,9 +430,6 @@ public:
 
     //API for enabling/disabling measurement data
     void setMeasurements(bool enable);
-
-    //thread loops
-    void notificationThread();
 
     ///Notification callback functions
     static void frameCallbackRelay(CameraFrame* caFrame);
@@ -469,34 +452,48 @@ public:
     status_t initSharedVideoBuffers(void *buffers, uint32_t *offsets, int fd, size_t length, size_t count);
     status_t releaseRecordingFrame(const sp<IMemory>& mem);
 
-    //Internal class definitions
-    class NotificationThread : public Thread {
-        AppCallbackNotifier* mAppCallbackNotifier;
-        MessageQueue mNotificationThreadQ;
+private:
+    class NotificationThread : public Thread
+    {
     public:
-        enum NotificationThreadCommands
+        NotificationThread(AppCallbackNotifier * const appCallbackNotifier) :
+            Thread(false),
+            mAppCallbackNotifier(appCallbackNotifier)
+        {}
+
+    protected:
+        bool threadLoop()
         {
-        NOTIFIER_EXIT
-        };
-    public:
-        NotificationThread(AppCallbackNotifier* nh)
-            : Thread(false), mAppCallbackNotifier(nh) { }
-        virtual bool threadLoop() {
             mAppCallbackNotifier->notificationThread();
             return false;
         }
 
-        MessageQueue &msgQ() { return mNotificationThreadQ;}
+    private:
+        AppCallbackNotifier * const mAppCallbackNotifier;
     };
 
-    //Friend declarations
-    friend class NotificationThread;
+    class PreviewFrameNotificationLocker
+    {
+    public:
+        PreviewFrameNotificationLocker(AppCallbackNotifier * appCallbackNotifier);
+        ~PreviewFrameNotificationLocker();
+
+        bool isLocked() const;
+
+    private:
+        AppCallbackNotifier * const mAppCallbackNotifier;
+        bool mIsLocked;
+    };
 
 private:
+    void notificationThread();
     void notifyEvent();
     void notifyFrame();
-    bool processMessage();
     void releaseSharedVideoBuffers();
+
+    void sendSnapshotFrame(CameraFrame * frame);
+    void sendPreviewFrame(CameraFrame * frame);
+    void sendFrameData(CameraFrame * frame);
 
 private:
     mutable Mutex mLock;
@@ -518,9 +515,13 @@ private:
     sp< NotificationThread> mNotificationThread;
     EventProvider *mEventProvider;
     FrameProvider *mFrameProvider;
+    MessageQueue mExitQueue;
     MessageQueue mEventQ;
     MessageQueue mFrameQ;
-    NotifierState mNotifierState;
+
+    Mutex mPreviewMutex;
+    Condition mPreviewCondition;
+    bool mPreviewNotificationInProgress;
 
     bool mPreviewing;
     sp<MemoryHeapBase> mPreviewHeap;
@@ -537,6 +538,8 @@ private:
     mutable Mutex mRecordingLock;
     bool mRecording;
     bool mMeasurementEnabled;
+
+    friend class NotificationThread;
 };
 
 

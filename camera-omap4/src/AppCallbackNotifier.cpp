@@ -26,7 +26,44 @@ namespace android {
 const int AppCallbackNotifier::NOTIFIER_TIMEOUT = -1;
 const size_t AppCallbackNotifier::EMPTY_RAW_SIZE = 1;
 
-/*--------------------NotificationHandler Class STARTS here-----------------------------*/
+
+
+
+inline AppCallbackNotifier::PreviewFrameNotificationLocker::PreviewFrameNotificationLocker(
+        AppCallbackNotifier * const appCallbackNotifier) :
+    mAppCallbackNotifier(appCallbackNotifier)
+{
+    Mutex::Autolock locker(mAppCallbackNotifier->mPreviewMutex);
+    CAMHAL_UNUSED(locker);
+
+    CAMHAL_ASSERT(!mAppCallbackNotifier->mPreviewNotificationInProgress);
+
+    mIsLocked = mAppCallbackNotifier->mPreviewing;
+
+    if ( mIsLocked )
+        mAppCallbackNotifier->mPreviewNotificationInProgress = true;
+}
+
+inline AppCallbackNotifier::PreviewFrameNotificationLocker::~PreviewFrameNotificationLocker()
+{
+    if ( !mIsLocked )
+        return;
+
+    Mutex::Autolock locker(mAppCallbackNotifier->mPreviewMutex);
+    CAMHAL_UNUSED(locker);
+
+    CAMHAL_ASSERT(mAppCallbackNotifier->mPreviewNotificationInProgress);
+    mAppCallbackNotifier->mPreviewNotificationInProgress = false;
+    mAppCallbackNotifier->mPreviewCondition.signal();
+}
+
+inline bool AppCallbackNotifier::PreviewFrameNotificationLocker::isLocked() const
+{
+    return mIsLocked;
+}
+
+
+
 
 /**
   * NotificationHandler class
@@ -37,6 +74,8 @@ const size_t AppCallbackNotifier::EMPTY_RAW_SIZE = 1;
 status_t AppCallbackNotifier::initialize()
 {
     LOG_FUNCTION_NAME
+
+    mPreviewNotificationInProgress = false;
 
     mMeasurementEnabled = false;
 
@@ -117,52 +156,31 @@ void AppCallbackNotifier::errorNotify(int error)
 
 void AppCallbackNotifier::notificationThread()
 {
-    bool shouldLive = true;
-    status_t ret;
-
     LOG_FUNCTION_NAME
 
-    while(shouldLive)
+    while ( true )
+    {
+        MessageQueue::waitForMsg(&mExitQueue, &mEventQ, &mFrameQ, AppCallbackNotifier::NOTIFIER_TIMEOUT);
+
+        if ( !mExitQueue.isEmpty() )
+            break;
+
+        if ( !mEventQ.isEmpty() )
         {
-        //CAMHAL_LOGDA("Notification Thread waiting for message");
-        ret = MessageQueue::waitForMsg(&mNotificationThread->msgQ()
-                                                        , &mEventQ
-                                                        , &mFrameQ
-                                                        , AppCallbackNotifier::NOTIFIER_TIMEOUT);
-
-        //CAMHAL_LOGDA("Notification Thread received message");
-
-        if(!mNotificationThread->msgQ().isEmpty())
-            {
-            ///Received a message from CameraHal, process it
-            CAMHAL_LOGDA("Notification Thread received message from Camera HAL");
-            shouldLive = processMessage();
-            if(!shouldLive)
-                {
-                CAMHAL_LOGDA("Notification Thread exiting.");
-                }
-            }
-        else if(!mEventQ.isEmpty())
-            {
             ///Received an event from one of the event providers
-            CAMHAL_LOGDA("Notification Thread received an event from event provider (CameraAdapter)");
+            //CAMHAL_LOGDA("Notification Thread received an event from event provider (CameraAdapter)");
             notifyEvent();
-            }
-        else if(!mFrameQ.isEmpty())
-            {
+            continue;
+        }
+
+        if ( !mFrameQ.isEmpty() )
+        {
             ///Received a frame from one of the frame providers
             //CAMHAL_LOGDA("Notification Thread received a frame from frame provider (CameraAdapter)");
             notifyFrame();
-            }
-        else
-            {
-            ///Timeout case
-            ///@todo: May have to signal an error
-            CAMHAL_LOGDA("Notification Thread timed out");
             continue;
-            }
-
         }
+    }
 
     CAMHAL_LOGDA("Notification Thread exited.");
     LOG_FUNCTION_NAME_EXIT
@@ -179,11 +197,6 @@ void AppCallbackNotifier::notifyEvent()
     CameraHalEvent *evt = NULL;
     CameraHalEvent::FocusEventData *focusEvtData;
     CameraHalEvent::ZoomEventData *zoomEvtData;
-
-    if(mNotifierState != AppCallbackNotifier::NOTIFIER_STARTED)
-    {
-        return;
-    }
 
     switch(msg.command)
         {
@@ -411,11 +424,6 @@ void AppCallbackNotifier::notifyFrame()
 
     bool ret = true;
 
-    if(mNotifierState != AppCallbackNotifier::NOTIFIER_STARTED)
-    {
-        return;
-    }
-
     frame = NULL;
     switch(msg.command)
         {
@@ -538,182 +546,24 @@ void AppCallbackNotifier::notifyFrame()
                              ( NULL != mDataCb) &&
                              ( NULL != mNotifyCb))
                     {
-
-                    Mutex::Autolock lock(mLock);
-                    //When enabled, measurement data is sent instead of video data
-                    if ( !mMeasurementEnabled )
-                        {
-
-                        if(!mAppSupportsStride)
-                            {
-                            buffer = mPreviewBuffers[mPreviewBufCount].get();
-                            if(!buffer || !frame->mBuffer)
-                                {
-                                CAMHAL_LOGDA("Error! One of the buffer is NULL");
-                                break;
-                                }
-                            }
-                        else
-                            {
-
-                            memBase = mSharedPreviewBuffers.valueFor( ( unsigned int ) frame->mBuffer );
-
-                            if( (NULL == memBase.get() ) || ( NULL == frame->mBuffer) )
-                                {
-                                CAMHAL_LOGDA("Error! One of the preview buffer is NULL");
-                                break;
-                                }
-                            }
-
-                        if(!mAppSupportsStride)
-                            {
-                              buf = (buffer->pointer());
-
-                              CAMHAL_LOGVB("%d:copy2Dto1D(%p, %p, %d, %d, %d, %d, %d,%s)", __LINE__, buf, frame->mBuffer,
-                                        frame->mWidth, frame->mHeight, frame->mAlignment, 2, frame->mLength, mPreviewPixelFormat);
-
-                              if (buf)
-                                copy2Dto1D(buf, frame->mBuffer, frame->mWidth, frame->mHeight, frame->mAlignment, frame->mOffset, 2, frame->mLength,
-                                           mPreviewPixelFormat);
-
-                            mPreviewBufCount = (mPreviewBufCount+1) % AppCallbackNotifier::MAX_BUFFERS;
-
-                            memBase = buffer;
-                            }
-
-
-                        if(mCameraHal->msgTypeEnabled(CAMERA_MSG_SHUTTER))
-                            {
-                            //activate shutter sound
-                            mNotifyCb(CAMERA_MSG_SHUTTER, 0, 0, mCallbackCookie);
-                            }
-
-                        if(mCameraHal->msgTypeEnabled(CAMERA_MSG_POSTVIEW_FRAME))
-                            {
-
-                            ///Give preview callback to app
-                            mDataCb(CAMERA_MSG_POSTVIEW_FRAME, memBase, mCallbackCookie);
-                            }
-
-                        }
-
+                    sendSnapshotFrame(frame);
                     mFrameProvider->returnFrame(frame->mBuffer,  ( CameraFrame::FrameType ) frame->mFrameType);
-
                     }
                 else if(( CameraFrame::PREVIEW_FRAME_SYNC== frame->mFrameType ) &&
                              ( NULL != mCameraHal.get() ) &&
                              ( NULL != mDataCb) &&
                              ( mCameraHal->msgTypeEnabled(CAMERA_MSG_PREVIEW_FRAME)  ))
                     {
-
-                    Mutex::Autolock lock(mLock);
-                    //When enabled, measurement data is sent instead of video data
-                    if ( !mMeasurementEnabled )
-                        {
-
-                        if(!mAppSupportsStride)
-                            {
-                            buffer = mPreviewBuffers[mPreviewBufCount].get();
-                            if(!buffer || !frame->mBuffer)
-                                {
-                                CAMHAL_LOGDA("Error! One of the buffer is NULL");
-                                break;
-                                }
-                            }
-                        else
-                            {
-
-                            memBase = mSharedPreviewBuffers.valueFor( ( unsigned int ) frame->mBuffer );
-
-                            if( (NULL == memBase.get() ) || ( NULL == frame->mBuffer) )
-                                {
-                                CAMHAL_LOGDA("Error! One of the preview buffer is NULL");
-                                break;
-                                }
-                            }
-
-                        if(!mAppSupportsStride)
-                            {
-                            ///CAMHAL_LOGDB("+Copy 0x%x to 0x%x frame-%dx%d", frame->mBuffer, buffer->pointer(), frame->mWidth,frame->mHeight );
-                            ///Copy the data into 1-D buffer
-                            buf = buffer->pointer();
-
-                            CAMHAL_LOGVB("%d:copy2Dto1D(%p, %p, %d, %d, %d, %d, %d,%s)", __LINE__, buf, frame->mBuffer,
-                                      frame->mWidth, frame->mHeight, frame->mAlignment, 2, frame->mLength, mPreviewPixelFormat);
-
-                            if (buf)
-                              copy2Dto1D(buf, frame->mBuffer, frame->mWidth, frame->mHeight, frame->mAlignment, frame->mOffset, 2, frame->mLength,
-                                         mPreviewPixelFormat);
-                            ///CAMHAL_LOGDA("-Copy");
-
-                            //Increment the buffer count
-                            mPreviewBufCount = (mPreviewBufCount+1) % AppCallbackNotifier::MAX_BUFFERS;
-
-                            memBase = buffer;
-                            }
-
-                        ///Give preview callback to app
-                        mDataCb(CAMERA_MSG_PREVIEW_FRAME, memBase, mCallbackCookie);
-
-                        }
-
+                    sendPreviewFrame(frame);
                     mFrameProvider->returnFrame(frame->mBuffer,  ( CameraFrame::FrameType ) frame->mFrameType);
-
                     }
                 else if(( CameraFrame::FRAME_DATA_SYNC == frame->mFrameType ) &&
                              ( NULL != mCameraHal.get() ) &&
                              ( NULL != mDataCb) &&
                              ( mCameraHal->msgTypeEnabled(CAMERA_MSG_PREVIEW_FRAME)  ))
                     {
-
-                    if(!mAppSupportsStride)
-                        {
-                        buffer = mPreviewBuffers[mPreviewBufCount].get();
-                        if(!buffer || !frame->mBuffer)
-                            {
-                            CAMHAL_LOGDA("Error! One of the buffer is NULL");
-                            break;
-                            }
-                        }
-                    else
-                        {
-
-                        memBase = mSharedPreviewBuffers.valueFor( ( unsigned int ) frame->mBuffer );
-
-                        if( (NULL == memBase.get() ) || ( NULL == frame->mBuffer) )
-                            {
-                            CAMHAL_LOGDA("Error! One of the preview buffer is NULL");
-                            break;
-                            }
-                        }
-
-                    if(!mAppSupportsStride)
-                        {
-
-                        if ( buffer->size () >= frame->mLength )
-                            {
-                              buf = buffer->pointer();
-                              if (buf)
-                                memcpy(buf, ( void * )  frame->mBuffer, frame->mLength);
-                            }
-                        else
-                            {
-                              buf = buffer->pointer();
-                              if (buf)
-                                memset(buf, 0, buffer->size());
-                            }
-
-                        //Increment the buffer count
-                        mPreviewBufCount = (mPreviewBufCount+1) % AppCallbackNotifier::MAX_BUFFERS;
-
-                        memBase = buffer;
-                        }
-
-                    ///Give preview callback to app
-                    mDataCb(CAMERA_MSG_PREVIEW_FRAME, memBase, mCallbackCookie);
-
+                    sendFrameData(frame);
                     mFrameProvider->returnFrame(frame->mBuffer,  ( CameraFrame::FrameType ) frame->mFrameType);
-
                     }
                 else
                     {
@@ -814,53 +664,14 @@ void AppCallbackNotifier::eventCallback(CameraHalEvent* chEvt)
     LOG_FUNCTION_NAME_EXIT
 }
 
-
-bool AppCallbackNotifier::processMessage()
-{
-    ///Retrieve the command from the command queue and process it
-    Message msg;
-
-    LOG_FUNCTION_NAME
-
-    CAMHAL_LOGDA("+Msg get...");
-    mNotificationThread->msgQ().get(&msg);
-    CAMHAL_LOGDA("-Msg get...");
-    bool ret = true;
-
-    switch(msg.command)
-        {
-        case NotificationThread::NOTIFIER_EXIT:
-            {
-            CAMHAL_LOGDA("Received NOTIFIER_EXIT command from Camera HAL");
-            mNotifierState = AppCallbackNotifier::NOTIFIER_EXITED;
-            ret = false;
-            break;
-            }
-        }
-
-
-    ///Signal the semaphore if it is sent as part of the message
-    if(msg.arg1)
-        {
-        CAMHAL_LOGDA("+Signalling semaphore from CameraHAL..");
-        Semaphore &sem = *((Semaphore*)msg.arg1);
-        sem.Signal();
-        CAMHAL_LOGDA("-Signalling semaphore from CameraHAL..");
-        }
-
-    LOG_FUNCTION_NAME_EXIT
-
-    return ret;
-
-
-}
-
 AppCallbackNotifier::~AppCallbackNotifier()
 {
     LOG_FUNCTION_NAME
 
-    ///Stop app callback notifier if not already stopped
-    stop();
+    Message exitMessage;
+    mExitQueue.put(&exitMessage);
+    mNotificationThread->requestExitAndWait();
+    mNotificationThread.clear();
 
     ///Unregister with the frame provider
     if ( NULL != mFrameProvider )
@@ -873,28 +684,6 @@ AppCallbackNotifier::~AppCallbackNotifier()
         {
         mEventProvider->disableEventNotification(CameraHalEvent::ALL_EVENTS);
         }
-
-    ///Kill the display thread
-    Semaphore sem;
-    sem.Create();
-    Message msg;
-    msg.command = NotificationThread::NOTIFIER_EXIT;
-
-    //Send the semaphore to signal once the command is completed
-    msg.arg1 = &sem;
-
-    ///Post the message to display thread
-    mNotificationThread->msgQ().put(&msg);
-
-    ///Wait for the ACK - implies that the thread is now started and waiting for frames
-    sem.Wait();
-
-    //Exit and cleanup the thread
-    mNotificationThread->requestExitAndWait();
-
-    //Delete the display thread
-    mNotificationThread.clear();
-
 
     ///Free the event and frame providers
     if ( NULL != mEventProvider )
@@ -943,6 +732,185 @@ void AppCallbackNotifier::releaseSharedVideoBuffers()
     LOG_FUNCTION_NAME_EXIT
 }
 
+void AppCallbackNotifier::sendSnapshotFrame(CameraFrame * const frame)
+{
+    LOG_FUNCTION_NAME
+
+    if ( !frame->mBuffer )
+    {
+        CAMHAL_LOGEA("Frame buffer is empty");
+        return;
+    }
+
+    PreviewFrameNotificationLocker previewFrameNotificationLocker(this);
+    if ( !previewFrameNotificationLocker.isLocked() )
+        return;
+
+    Mutex::Autolock locker(mLock);
+    CAMHAL_UNUSED(locker);
+
+    // when enabled, measurement data is sent instead of video data
+    if ( mMeasurementEnabled )
+        return;
+
+    sp<MemoryBase> memBase;
+
+    if ( !mAppSupportsStride )
+    {
+        memBase = mPreviewBuffers[mPreviewBufCount].get();
+        if ( !memBase.get() )
+        {
+            CAMHAL_LOGEA("Error! One of the buffer is NULL");
+            return;
+        }
+
+        void * const buf = memBase->pointer();
+        CAMHAL_LOGVB("%d:copy2Dto1D(%p, %p, %d, %d, %d, %d, %d,%s)", __LINE__, buf, frame->mBuffer,
+                frame->mWidth, frame->mHeight, frame->mAlignment, 2, frame->mLength, mPreviewPixelFormat);
+
+        if ( buf )
+        {
+            copy2Dto1D(buf, frame->mBuffer, frame->mWidth, frame->mHeight, frame->mAlignment, frame->mOffset, 2, frame->mLength,
+                    mPreviewPixelFormat);
+        }
+
+        mPreviewBufCount = (mPreviewBufCount+1) % AppCallbackNotifier::MAX_BUFFERS;
+    }
+    else
+    {
+        memBase = mSharedPreviewBuffers.valueFor((unsigned int)frame->mBuffer);
+        if( !memBase.get() )
+        {
+            CAMHAL_LOGEA("Error! One of the preview buffer is NULL");
+            return;
+        }
+    }
+
+    if ( mCameraHal->msgTypeEnabled(CAMERA_MSG_SHUTTER) )
+    {
+        //activate shutter sound
+        mNotifyCb(CAMERA_MSG_SHUTTER, 0, 0, mCallbackCookie);
+    }
+
+    if ( mCameraHal->msgTypeEnabled(CAMERA_MSG_POSTVIEW_FRAME) )
+    {
+        ///Give preview callback to app
+        mDataCb(CAMERA_MSG_POSTVIEW_FRAME, memBase, mCallbackCookie);
+    }
+}
+
+void AppCallbackNotifier::sendPreviewFrame(CameraFrame * const frame)
+{
+    LOG_FUNCTION_NAME
+
+    if ( !frame->mBuffer )
+    {
+        CAMHAL_LOGEA("Frame buffer is empty");
+        return;
+    }
+
+    PreviewFrameNotificationLocker previewFrameNotificationLocker(this);
+    if ( !previewFrameNotificationLocker.isLocked() )
+        return;
+
+    sp<MemoryBase> memBase;
+
+    Mutex::Autolock locker(mLock);
+    CAMHAL_UNUSED(locker);
+
+    // when enabled, measurement data is sent instead of video data
+    if ( mMeasurementEnabled )
+        return;
+
+    if ( !mAppSupportsStride )
+    {
+        memBase = mPreviewBuffers[mPreviewBufCount].get();
+        if ( !memBase.get() )
+        {
+            CAMHAL_LOGEA("Error! One of the buffer is NULL");
+            return;
+        }
+
+        void * const buf = memBase->pointer();
+        CAMHAL_LOGVB("%d:copy2Dto1D(%p, %p, %d, %d, %d, %d, %d,%s)", __LINE__, buf, frame->mBuffer,
+                frame->mWidth, frame->mHeight, frame->mAlignment, 2, frame->mLength, mPreviewPixelFormat);
+
+        if ( buf )
+        {
+            copy2Dto1D(buf, frame->mBuffer, frame->mWidth, frame->mHeight, frame->mAlignment, frame->mOffset, 2, frame->mLength,
+                    mPreviewPixelFormat);
+        }
+
+        mPreviewBufCount = (mPreviewBufCount+1) % AppCallbackNotifier::MAX_BUFFERS;
+    }
+    else
+    {
+        memBase = mSharedPreviewBuffers.valueFor((unsigned int)frame->mBuffer);
+        if ( !memBase.get() )
+        {
+            CAMHAL_LOGEA("Error! One of the preview buffer is NULL");
+            return;
+        }
+    }
+
+    ///Give preview callback to app
+    mDataCb(CAMERA_MSG_PREVIEW_FRAME, memBase, mCallbackCookie);
+}
+
+void AppCallbackNotifier::sendFrameData(CameraFrame * const frame)
+{
+    LOG_FUNCTION_NAME
+
+    if ( !frame->mBuffer )
+    {
+        CAMHAL_LOGEA("Frame buffer is empty");
+        return;
+    }
+
+    PreviewFrameNotificationLocker previewFrameNotificationLocker(this);
+    if ( !previewFrameNotificationLocker.isLocked() )
+        return;
+
+    sp<MemoryBase> memBase;
+
+    if ( !mAppSupportsStride )
+    {
+        memBase = mPreviewBuffers[mPreviewBufCount].get();
+        if( !memBase.get() )
+        {
+            CAMHAL_LOGEA("Error! One of the buffer is NULL");
+            return;
+        }
+
+        if ( memBase->size() >= frame->mLength )
+        {
+            void * const buf = memBase->pointer();
+            if ( buf )
+                memcpy(buf, frame->mBuffer, frame->mLength);
+        }
+        else
+        {
+            void * const buf = memBase->pointer();
+            if ( buf )
+                memset(buf, 0, memBase->size());
+        }
+
+        // increment the buffer count
+        mPreviewBufCount = (mPreviewBufCount+1) % AppCallbackNotifier::MAX_BUFFERS;
+    }
+    else
+    {
+        memBase = mSharedPreviewBuffers.valueFor((unsigned int)frame->mBuffer);
+        if ( !memBase.get() )
+        {
+            CAMHAL_LOGEA("Error! One of the preview buffer is NULL");
+            return;
+        }
+    }
+
+    ///Give preview callback to app
+    mDataCb(CAMERA_MSG_PREVIEW_FRAME, memBase, mCallbackCookie);
+}
 
 void AppCallbackNotifier::setEventProvider(int32_t eventMask, MessageNotifier * eventNotifier)
 {
@@ -1170,6 +1138,15 @@ status_t AppCallbackNotifier::stopPreviewCallbacks()
         return -1;
         }
 
+    Mutex::Autolock previewLocker(mPreviewMutex);
+
+    mPreviewing = false;
+
+    if ( mPreviewNotificationInProgress )
+        mPreviewCondition.wait(mPreviewMutex);
+
+    CAMHAL_ASSERT(!mPreviewNotificationInProgress);
+
     if ( NO_ERROR == ret )
         {
          mFrameProvider->disableFrameNotification(CameraFrame::PREVIEW_FRAME_SYNC);
@@ -1201,10 +1178,6 @@ status_t AppCallbackNotifier::stopPreviewCallbacks()
 
         mPreviewHeap.clear();
         }
-
-    mPreviewing = false;
-
-    LOG_FUNCTION_NAME_EXIT
 
     CAMHAL_LOGDA("- Exiting stopPreviewCallbacks");
     return ret;
@@ -1395,63 +1368,6 @@ status_t AppCallbackNotifier::disableMsgType(int32_t msgType)
 
 }
 
-status_t AppCallbackNotifier::start()
-{
-    LOG_FUNCTION_NAME
-    if(mNotifierState==AppCallbackNotifier::NOTIFIER_STARTED)
-        {
-        CAMHAL_LOGDA("AppCallbackNotifier already running");
-        LOG_FUNCTION_NAME_EXIT
-        return ALREADY_EXISTS;
-        }
-
-    ///Check whether initial conditions are met for us to start
-    ///A frame provider should be available, if not return error
-    if(!mFrameProvider)
-        {
-        ///AppCallbackNotifier not properly initialized
-        CAMHAL_LOGEA("AppCallbackNotifier not properly initialized - Frame provider is NULL");
-        LOG_FUNCTION_NAME_EXIT
-        return NO_INIT;
-        }
-
-    ///At least one event notifier should be available, if not return error
-    ///@todo Modify here when there is an array of event providers
-    if(!mEventProvider)
-        {
-        CAMHAL_LOGEA("AppCallbackNotifier not properly initialized - Event provider is NULL");
-        LOG_FUNCTION_NAME_EXIT
-        ///AppCallbackNotifier not properly initialized
-        return NO_INIT;
-        }
-
-    mNotifierState = NOTIFIER_STARTED;
-
-    LOG_FUNCTION_NAME_EXIT
-
-    return NO_ERROR;
-
-}
-
-status_t AppCallbackNotifier::stop()
-{
-    LOG_FUNCTION_NAME
-
-    if(mNotifierState!=AppCallbackNotifier::NOTIFIER_STARTED)
-        {
-        CAMHAL_LOGEA("AppCallbackNotifier already in stopped state");
-        LOG_FUNCTION_NAME_EXIT
-        return ALREADY_EXISTS;
-        }
-
-    mNotifierState = NOTIFIER_STOPPED;
-
-    LOG_FUNCTION_NAME_EXIT
-    return NO_ERROR;
-}
-
-
-/*--------------------NotificationHandler Class ENDS here-----------------------------*/
 
 
 
