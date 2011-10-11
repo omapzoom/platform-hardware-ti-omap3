@@ -3392,6 +3392,7 @@ status_t OMXCameraAdapter::startPreview()
         if(eError!=OMX_ErrorNone)
             {
             CAMHAL_LOGEB("OMX_SendCommand(OMX_StateExecuting)-0x%x", eError);
+            goto EXIT;
             }
 
         CAMHAL_LOGDA("+Waiting for component to go into EXECUTING state");
