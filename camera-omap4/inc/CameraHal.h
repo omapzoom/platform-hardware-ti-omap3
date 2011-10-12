@@ -921,9 +921,6 @@ private:
             /** Deinitialize CameraHal */
             void deinitialize();
 
-            //Reloads the CameraAdapter
-            status_t reloadAdapter();
-
             status_t parseResolution(const char *resStr, int &width, int &height);
 
             void insertSupportedParams();
@@ -1023,8 +1020,6 @@ private:
     bool mDisplayPaused;
     //Index of current camera adapter
     int mCameraIndex;
-    //When set, reloads Camera Adapter after each stopPreview
-    bool mReloadAdapter;
 
     mutable Mutex mLock;
 

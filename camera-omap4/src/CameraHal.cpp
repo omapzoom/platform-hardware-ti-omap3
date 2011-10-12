@@ -255,28 +255,6 @@ status_t CameraHal::setParameters(const CameraParameters &params)
 
     Mutex::Autolock lock(mLock);
 
-    //This can only happen when there is a mismatch
-    //between the Camera application default
-    //CameraHal's own default at the start
-    if ( mReloadAdapter )
-        {
-         // if ( NULL != mCameraAdapter )
-            // {
-             // Free the camera adapter
-             //mCameraAdapter.clear();
-
-             //Close the camera adapter DLL
-             //::dlclose(mCameraAdapterHandle);
-            // }
-
-        if ( reloadAdapter() < 0 )
-            {
-            CAMHAL_LOGEA("CameraAdapter reload failed");
-            }
-
-        mReloadAdapter = false;
-        }
-
     if ((valstr = params.get(TICameraParameters::KEY_S3D_SUPPORTED)) != NULL)
         {
         isS3d = (!strcmp(valstr, "true"));
@@ -941,9 +919,6 @@ status_t CameraHal::setParameters(const CameraParameters &params)
         mMsgEnabled &= ~CAMERA_MSG_SHUTTER;
         mParameters.set(TICameraParameters::KEY_SHUTTER_ENABLE, valstr);
         }
-
-
-    CAMHAL_LOGDB("mReloadAdapter %d", (int) mReloadAdapter);
 
     LOG_FUNCTION_NAME_EXIT
 
@@ -2499,8 +2474,6 @@ CameraHal::CameraHal(int cameraId)
 
     mCameraIndex = cameraId;
 
-    mReloadAdapter = false;
-
     LOG_FUNCTION_NAME_EXIT
 }
 
@@ -2694,105 +2667,6 @@ if(!mCameraPropertiesArr)
 
         return NO_MEMORY;
 
-}
-
-status_t CameraHal::reloadAdapter()
-{
-
-    typedef CameraAdapter* (*CameraAdapterFactory)();
-    CameraAdapterFactory f = NULL;
-    status_t ret = NO_ERROR;
-    int sensor_index = 0;
-
-    LOG_FUNCTION_NAME
-
-    if ( mCameraIndex >= gCameraProperties->camerasSupported() )
-        {
-        CAMHAL_LOGEA("Camera Index exceeds number of supported cameras!");
-        return -EINVAL;
-        }
-
-    mCameraPropertiesArr = ( CameraProperties::CameraProperty **) gCameraProperties->getProperties(mCameraIndex);
-
-    if (!mCameraPropertiesArr)
-        {
-        CAMHAL_LOGEB("getProperties() returned a NULL property set for Camera index %d", mCameraIndex);
-        return NO_INIT;
-        }
-#ifdef DEBUG_LOG
-
-    ///Dump the properties of this Camera
-    dumpProperties(mCameraPropertiesArr);
-
-#endif
-
-    ///Check if a valid adapter DLL name is present for the first camera
-    if ( NULL == mCameraPropertiesArr[CameraProperties::PROP_INDEX_CAMERA_ADAPTER_DLL_NAME] )
-        {
-        CAMHAL_LOGEA("No Camera adapter DLL set for default camera");
-        return NO_INIT;
-        }
-
-    if ( NULL != mCameraPropertiesArr[CameraProperties::PROP_INDEX_CAMERA_SENSOR_INDEX] )
-        {
-        sensor_index = atoi(mCameraPropertiesArr[CameraProperties::PROP_INDEX_CAMERA_SENSOR_INDEX]->mPropValue);
-        }
-
-    /// Create the camera adapter
-    mCameraAdapterHandle = ::dlopen( ( const char * ) mCameraPropertiesArr[CameraProperties::PROP_INDEX_CAMERA_ADAPTER_DLL_NAME]->mPropValue, RTLD_NOW);
-    if ( NULL == mCameraAdapterHandle )
-        {
-        CAMHAL_LOGEB("Unable to open CameraAdapter Library %s for default camera", (const char*)mCameraPropertiesArr[CameraProperties::PROP_INDEX_CAMERA_ADAPTER_DLL_NAME]->mPropValue);
-        return -1;
-        }
-
-    //Delete all existing instances of CameraHAL objects
-    //deinitialize();
-
-    f = (CameraAdapterFactory) ::dlsym(mCameraAdapterHandle, "CameraAdapter_Factory");
-    if (!f)
-        {
-        ::dlclose(mCameraAdapterHandle);
-        return -1;
-        }
-
-    mCameraAdapter = f();
-    if (NULL == mCameraAdapter)
-        {
-        return -1;
-        }
-
-    ret = mCameraAdapter->setParameters(mParameters);
-    if (NO_ERROR != ret)
-        {
-        return ret;
-        }
-
-    ret = mCameraAdapter->initialize(sensor_index);
-    if (NO_ERROR != ret)
-        {
-        return ret;
-        }
-
-    mCameraAdapter->sendCommand(CameraAdapter::CAMERA_CANCEL_TIMEOUT);
-    mCameraAdapter->registerImageReleaseCallback(releaseImageBuffers, (void *) this);
-    mCameraAdapter->registerEndCaptureCallback(endImageCapture, (void *)this);
-    initDefaultParameters();
-
-    if ( NULL != mAppCallbackNotifier.get() )
-        {
-        mAppCallbackNotifier->setEventProvider(CameraHalEvent::ALL_EVENTS, mCameraAdapter);
-        mAppCallbackNotifier->setFrameProvider(mCameraAdapter);
-        mCameraAdapter->setErrorHandler(mAppCallbackNotifier.get());
-        }
-
-    if ( NULL != mDisplayAdapter.get() )
-        {
-        mDisplayAdapter->setFrameProvider(mCameraAdapter);
-        }
-
-    LOG_FUNCTION_NAME_EXIT
-    return ret;
 }
 
 void CameraHal::dumpProperties(CameraProperties::CameraProperty** cameraProps)
