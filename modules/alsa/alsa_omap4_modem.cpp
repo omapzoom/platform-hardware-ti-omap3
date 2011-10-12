@@ -196,6 +196,18 @@ AudioModemAlsa::AudioModemAlsa()
                         (String8)Omap4ALSAManager::EqualizerProfileList[1]);
     propModemMgr.set((String8)Omap4ALSAManager::SDT_EQ_PROFILE,
                         (String8)Omap4ALSAManager::EqualizerProfileList[0]);
+
+    // initialize priority table
+    mAudioDevicePriority[AUDIO_MODEM_DEVICE_HANDFREE_PRIORITY] =
+                                AudioModemInterface::AUDIO_MODEM_HANDFREE;
+    mAudioDevicePriority[AUDIO_MODEM_DEVICE_HANDSET_PRIORITY] =
+                                AudioModemInterface::AUDIO_MODEM_HANDSET;
+    mAudioDevicePriority[AUDIO_MODEM_DEVICE_HEADSET_PRIORITY] =
+                                AudioModemInterface::AUDIO_MODEM_HEADSET;
+#ifdef AUDIO_BLUETOOTH
+    mAudioDevicePriority[AUDIO_MODEM_DEVICE_BLUETOOTH_PRIORITY] =
+                                AudioModemInterface::AUDIO_MODEM_BLUETOOTH;
+#endif
 }
 
 AudioModemAlsa::~AudioModemAlsa()
@@ -453,17 +465,17 @@ exit:
 
 status_t AudioModemAlsa::setCurrentAudioModemModes(uint32_t devices)
 {
-    if (devices & AudioModemInterface::AUDIO_MODEM_HANDSET) {
-        mCurrentAudioModemModes = AudioModemInterface::AUDIO_MODEM_HANDSET;
-    } else if (devices & AudioModemInterface::AUDIO_MODEM_HANDFREE) {
-        mCurrentAudioModemModes = AudioModemInterface::AUDIO_MODEM_HANDFREE;
-    } else if (devices & AudioModemInterface::AUDIO_MODEM_HEADSET) {
-        mCurrentAudioModemModes = AudioModemInterface::AUDIO_MODEM_HEADSET;
-#ifdef AUDIO_BLUETOOTH
-    } else if (devices & AudioModemInterface::AUDIO_MODEM_BLUETOOTH) {
-        mCurrentAudioModemModes = AudioModemInterface::AUDIO_MODEM_BLUETOOTH;
-#endif
-    } else {
+    int i;
+    uint32_t nextAudioMode = 0;
+
+    for (i = 0; i < AUDIO_MODEM_MAX_DEVICE; i++) {
+        if (devices & mAudioDevicePriority[i]) {
+            nextAudioMode = mCurrentAudioModemModes = mAudioDevicePriority[i];
+            LOGV("New Audio Modem Modes: %04x", mCurrentAudioModemModes);
+            return NO_ERROR;
+        }
+    }
+    if (!nextAudioMode) {
         LOGE("Devices %04x not supported...", devices);
         if (!mCurrentAudioModemModes) {
             LOGE("No current devices switch to AUDIO_MODEM_HANDSET...");
@@ -473,7 +485,7 @@ status_t AudioModemAlsa::setCurrentAudioModemModes(uint32_t devices)
         }
         return NO_ERROR;
     }
-    LOGV("New Audio Modem Modes: %04x", mCurrentAudioModemModes);
+
     return NO_ERROR;
 }
 
