@@ -43,7 +43,7 @@ extern "C" {
 
 /* OMAP CPU definitions */
 #define CPU_NAME "omap_cpu"
-#define CPU_UEVENT "change@/devices/platform/omap_temp_sensor.0/hwmon/hwmon1"
+#define CPU_UEVENT "change@/devices/platform/omap_temp_sensor.0/hwmon/hwmonx"
 
 /* LPDDR definitions */
 #define LPDDR_NAME "lpddr2"
@@ -54,7 +54,7 @@ extern "C" {
 /* PCB definitions */
 #define PCB_NAME "pcb"
 /* TODO: Find the uevent */
-#define PCB_UEVENT "change@/devices/platform/i2c_omap.3/i2c-3/3-0048/hwmon/hwmon0"
+#define PCB_UEVENT "change@/devices/platform/i2c_omap.3/i2c-3/3-0048/hwmon/hwmonx"
 
 
 static pthread_t thermalDaemonThrd;
@@ -70,9 +70,9 @@ struct event_logging_sysfs {
     {"/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq"},
     {"/sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed"},
     {"/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq"},
-    {"/sys/class/hwmon/hwmon1/device/temp1_max"},
-    {"/sys/class/hwmon/hwmon1/device/temp1_max_hyst"},
-    {"/sys/class/hwmon/hwmon1/device/update_rate"},
+    {"/sys/devices/platform/omap_temp_sensor.0/temp1_max"},
+    {"/sys/devices/platform/omap_temp_sensor.0/temp1_max_hyst"},
+    {"/sys/devices/platform/omap_temp_sensor.0/update_rate"},
 };
 
 static void ThermalDaemonEventLog(void)
@@ -142,7 +142,8 @@ static void ThermalDaemonEventHandler(void)
         nr = poll(&fds, 1, -1);
         if(nr > 0 && fds.revents == POLLIN) {
             int count = recv(fd, &buffer, length, 0);
-            if(strcmp(buffer, CPU_UEVENT) == 0) {
+            /* Do not include the hwmon instance number in the comparison */
+            if(strncmp(buffer, CPU_UEVENT, strlen(buffer) - 1) == 0) {
 #ifdef TD_DEBUG
             LOGD("ThermalDaemon:Uevent posted from %s\n", buffer);
 #endif
