@@ -41,6 +41,7 @@ extern "C" {
 
 int thermal_manager_algo(const char *string);
 int thermal_manager_init(int type);
+int thermal_manager_monitoring(int type);
 
 #if __cplusplus
 }  // extern "C"

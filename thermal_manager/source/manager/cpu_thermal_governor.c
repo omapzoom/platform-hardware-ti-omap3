@@ -19,7 +19,7 @@
 
 /*
  *
- * Global Variables (CPU Freq parameters)
+ * Global Variables (CPU Freq parameters + regular thermal manager)
  *
  */
 static u32 available_freq[OPPS_NUMBER];
@@ -34,6 +34,14 @@ static int current_t_high = 0; /* temperature threshold (high) at OMAP hot spot 
 static int current_t_low = 0;  /* temperature threshold (low) at OMAP hot spot level */
 static int cpu_temp = 0; /* Temperature at OMAP hot spot level */
 static int absolute_delta = 0;
+/*
+ * Global variables used to extrapolate OMAP hot spot temperature from
+ * average on-die sensor and PCB temperature
+ */
+static int pcb_temp = 0;
+static int average_cpu_sensor_temp = 0; /* Average temperature at OMAP sensor level */
+static int average_period = NORMAL_TEMP_MONITORING_RATE * 1000; /* 1 second */
+static int cpu_sensor_temp_table[AVERAGE_NUMBER];
 
 #define DEBUG 1
 
@@ -42,6 +50,29 @@ static int absolute_delta = 0;
  * Internal functions
  *
  */
+
+/*
+ * Convert the result of ADC conversion into temperature
+ * for a thermistor connected to TWL6030's GPADC
+ */
+static inline int convert_adc_to_temp(u32 adc_value)
+{
+    int temp;
+    float tmp1;
+    float tmp2;
+    /* Main formula to be used:
+     (Beta*T0)/(Beta-T0*LN(-R0*(ADC_VALUE*(Rx+Ry)*Vref-1023*Ry*Vx)/(ADC_VALUE*Rx*Ry*Vref)))-273.15
+     Following formula has been simplified assuming that Vref = Vx.
+    */
+    tmp1 = THERM_R0 * (1023 * THERM_RY -
+                       (float)adc_value * (THERM_RX + THERM_RY)) /
+                       ((float)adc_value * THERM_RX * THERM_RY);
+    tmp2 = ((THERM_BETA * THERM_T0) / (1000 * THERM_BETA - THERM_T0 * log(tmp1)));
+    temp = (tmp2 * 1000) - THERM_KELVIN_TO_CELSIUS;
+
+    return temp;
+}
+
 /*
  * Convert the temperature from the OMAP on-die temp sensor into
  * OMAP hot spot temperature.
@@ -55,10 +86,42 @@ static inline int convert_omap_sensor_temp_to_hotspot_temp(u32 type, int temp)
 {
     int slope; /* multiplied by 1000 */
     int constant; /* milli-celsius degrees */
+    u32 adc_value = 0;
+    u32 i = 0;
+
     if (type == OMAP_CPU) {
         slope = config_file.omap_cpu_temperature_slope;
         constant = config_file.omap_cpu_temperature_offset;
-        absolute_delta = ((temp * slope / 1000) + constant);
+        if (config_file.pcb_temp_sensor_used == true) {
+            if (config_file.omap_pcb_temp_sensor_id) {
+                if (strcmp(config_file.pcb_temp_sensor_type,"thermistor") == 0) {
+                    pcb_temp = 0;
+                    i = 0;
+                    /* Ensure that pcb_temp value is in acceptable range */
+                    /* Restart the measurement if needed */
+                    /* Potential problem with collision on TWL6030 GPADC channel conversion */
+                    do {
+                        adc_value = atoi(read_from_file(config_file.temperature_file_sensors[PCB_FILE]));
+		        pcb_temp = convert_adc_to_temp(adc_value);
+                        i++;
+                    } while ((pcb_temp < -40000) && (pcb_temp > 125000) && (i < 10));
+                } else if (strcmp(config_file.pcb_temp_sensor_type,"temp_sensor") == 0) {
+                    pcb_temp = atoi(read_from_file(config_file.temperature_file_sensors[PCB_FILE]));
+                } else {
+                    LOGD("Thermal Manager:Type of PCB temperature sensor is not supported \"%s\"\n",
+                         config_file.pcb_temp_sensor_type);
+                    return 0;
+                }
+                absolute_delta = (((average_cpu_sensor_temp - pcb_temp) * slope / 1000) + constant);
+                /* Ensure that this formula never returns negative value due to PCB temp > On-die sensor */
+                if (absolute_delta < 0) absolute_delta = 0;
+            } else {
+                LOGD("Thermal Manager:PCB Temp ID not found in config\n");
+                return 0;
+            }
+        } else { /* pcb_temp_sensor_used == false or not defined */
+            absolute_delta = ((temp * slope / 1000) + constant);
+        }
         return (temp + absolute_delta);
     } else {
         return 0;
@@ -80,9 +143,13 @@ static inline int convert_hotspot_temp_to_omap_sensor_temp(u32 type, int temp)
     int slope; /* multiplied by 1000 */
     int constant; /* milli-celsius degrees */
     if (type == OMAP_CPU) {
-        slope = config_file.omap_cpu_temperature_slope;
-        constant = config_file.omap_cpu_temperature_offset;
-        return (((temp - constant) * 1000) / (1000 + slope));
+        if (config_file.pcb_temp_sensor_used == true) {
+            return (temp - absolute_delta);
+        } else { /* pcb_temp_sensor_used == false or not defined */
+            slope = config_file.omap_cpu_temperature_slope;
+            constant = config_file.omap_cpu_temperature_offset;
+            return (((temp - constant) * 1000) / (1000 + slope));
+        }
     } else {
         return 0;
     }
@@ -133,55 +200,85 @@ static void update_omap_rate(u32 rate)
  * The goal of these functions is to update the settings of thermal thresholds
  * only if this is required to avoid useless SYSFS accesses.
  */
-static void update_t_high(u32 t_high)
+static void update_t_high(int t_high)
 {
     char buf[SIZE];
 #ifdef DEBUG
-    LOGD("update_t_high (%ld)\n", t_high);
+    if (current_t_high != t_high) {
+        LOGD("update_t_high (%d)\n", t_high);
+    }
 #endif
     sprintf(buf, "%d\n", convert_hotspot_temp_to_omap_sensor_temp(OMAP_CPU, t_high));
     write_to_file(
         config_file.omaptemp_file_paths[OMAP_CPU_THRESHOLD_HIGH_PATH],
         buf);
-    current_t_high = t_high;
 }
 
-static void update_t_low(u32 t_low)
+static void update_t_low(int t_low)
 {
     char buf[SIZE];
 #ifdef DEBUG
-    LOGD("update_t_low (%ld)\n", t_low);
+    if (current_t_low != t_low) {
+        LOGD("update_t_low (%d)\n", t_low);
+    }
 #endif
     sprintf(buf, "%d\n", convert_hotspot_temp_to_omap_sensor_temp(OMAP_CPU, t_low));
     write_to_file(
         config_file.omaptemp_file_paths[OMAP_CPU_THRESHOLD_LOW_PATH],
         buf);
-    current_t_low = t_low;
 }
 
 /*
  * This function should ensure that high threshold is greater than low threshold
  * The sequence to change these thresholds will depend on current and next values
+ * If the PCB temperature is used, always reconfigure the thresholds because
+ * PCB temperature and absolute delta always change
+ * current_t_high is the current thermal threshold (high)
+ * next_t_high is the next thermal threshold (high)
+ * theshold_low is the current thermal threshold (low)
+ * t_low is the next thermal threshold (low)
  */
 static void update_thresholds(int next_t_high, int next_t_low)
 {
-    /* current_t_high is the current thermal threshold (high)*/
-    /* next_t_high is the next thermal threshold (high) */
-    if (current_t_high != next_t_high) {
-        if (next_t_high > current_t_low) update_t_high(next_t_high);
-    }
+    bool t_high_done = false;
+    if (config_file.pcb_temp_sensor_used == true) {
+        if (next_t_high > current_t_low) {
+            update_t_high(next_t_high);
+            current_t_high = next_t_high;
+            t_high_done = true;
+        }
 
-    /* theshold_low is the current thermal threshold (low) */
-    /* t_low is the next thermal threshold (low) */
-    if (current_t_low != next_t_low) {
-        if (next_t_low < current_t_high) update_t_low(next_t_low);
-    }
+        if (next_t_low < current_t_high) {
+            update_t_low(next_t_low);
+            current_t_low = next_t_low;
+        }
 
-    /* theshold_high is the current thermal threshold (high)*/
-    /* t_high is the next thermal threshold (high) */
-    if (current_t_high != next_t_high) {
-        if (next_t_high > current_t_low) update_t_high(next_t_high);
-    }
+        if (t_high_done == false) {
+            update_t_high(next_t_high);
+            current_t_high = next_t_high;
+        }
+    } else { /* pcb_temp_sensor_used == false or not defined */
+        if (current_t_high != next_t_high) {
+            if (next_t_high > current_t_low) {
+                update_t_high(next_t_high);
+                current_t_high = next_t_high;
+            }
+        }
+
+        if (current_t_low != next_t_low) {
+            if (next_t_low < current_t_high) {
+                update_t_low(next_t_low);
+                current_t_low = next_t_low;
+            }
+        }
+
+        if (current_t_high != next_t_high) {
+            if (next_t_high > current_t_low) {
+                update_t_high(next_t_high);
+                current_t_high = next_t_high;
+            }
+        }
+    } /* end of if (config_file.pcb_temp_sensor_used == true) */
 }
 
 /* Read some SYSFS parameters */
@@ -316,6 +413,10 @@ static void safe_zone(void)
 
     update_omap_rate(NORMAL_TEMP_MONITORING_RATE);
 
+    if (config_file.pcb_temp_sensor_used == true) {
+        average_period = NORMAL_TEMP_MONITORING_RATE * 1000;
+    }
+
     update_thresholds(config_file.omap_cpu_threshold_monitoring,
             config_file.omap_cpu_threshold_monitoring - HYSTERESIS_VALUE);
 
@@ -354,6 +455,10 @@ static void monitoring_zone(void)
     }
 
     update_omap_rate(FAST_TEMP_MONITORING_RATE);
+
+    if (config_file.pcb_temp_sensor_used == true) {
+        average_period = FAST_TEMP_MONITORING_RATE * 1000;
+    }
 
     update_thresholds(config_file.omap_cpu_threshold_alert,
             config_file.omap_cpu_threshold_monitoring - HYSTERESIS_VALUE);
@@ -414,6 +519,10 @@ static void alert_zone(void)
     }
 
     update_omap_rate(FAST_TEMP_MONITORING_RATE);
+
+    if (config_file.pcb_temp_sensor_used == true) {
+        average_period = FAST_TEMP_MONITORING_RATE * 1000;
+    }
 
     update_thresholds(config_file.omap_cpu_threshold_panic,
             config_file.omap_cpu_threshold_alert - HYSTERESIS_VALUE);
@@ -512,6 +621,10 @@ static void panic_zone(void)
         LOGD("OMAP CPU THERMAL - Pre-Fatal Zone (hot spot temp: %i)\n", cpu_temp);
         fflush(stdout);
 #endif
+    }
+
+    if (config_file.pcb_temp_sensor_used == true) {
+        average_period = FAST_TEMP_MONITORING_RATE * 1000;
     }
 
     update_thresholds(threshold_fatal,
@@ -642,6 +755,13 @@ void init_cpu_thermal_governor(int sensor_temp)
     }
 #endif
 
+    if (config_file.pcb_temp_sensor_used == true) {
+        /* initialize the temperature table with current temperature */
+        for (i = 0; i < AVERAGE_NUMBER; i++)
+            cpu_sensor_temp_table[i] = sensor_temp;
+        average_cpu_sensor_temp = sensor_temp;
+    }
+
     /*
      * Force to initialize all temperature thresholds according to
      * the current thermal zone */
@@ -655,4 +775,52 @@ void init_cpu_thermal_governor(int sensor_temp)
         fflush(stdout);
     }
 #endif
+}
+
+/*
+ * Make an average of the OMAP on-die temperature
+ * this is helpful to handle burst activity of OMAP when extrapolating
+ * the OMAP hot spot temperature from on-die sensor and PCB temperature
+ * Re-evaluate the temperature gradient between hot spot and on-die sensor
+ * (See absolute_delta) and reconfigure the thresholds if needed
+ */
+int average_on_die_temperature(void)
+{
+    int sensor_temp = 0;
+    u32 i;
+
+    if (config_file.pcb_temp_sensor_used == true) {
+        /* Read current temperature */
+        sensor_temp = atoi(read_from_file(config_file.temperature_file_sensors[OMAP_CPU_FILE]));
+        /* if on-die sensor does not report a correct temperature value, keep the previous measurement */
+        if ((abs(sensor_temp - cpu_sensor_temp_table[0]) > 40000) || /* if difference between 2 measurements is > 40 C */
+            (sensor_temp > OMAP_CPU_MAX_TEMP) ||
+            (sensor_temp < OMAP_CPU_MIN_TEMP)) {
+            LOGD("Invalid value from on-die sensor %d, use %d instead",
+                  sensor_temp, cpu_sensor_temp_table[0]);
+            sensor_temp = cpu_sensor_temp_table[0];
+        }
+
+        /* Update historical buffer */
+        for (i = 1; i < AVERAGE_NUMBER; i++) {
+            cpu_sensor_temp_table[AVERAGE_NUMBER - i] =
+            cpu_sensor_temp_table[AVERAGE_NUMBER - i - 1];
+        }
+        cpu_sensor_temp_table[0] = sensor_temp;
+
+        /* Compute the new average value */
+        average_cpu_sensor_temp = 0;
+        for (i = 0; i < AVERAGE_NUMBER; i++) {
+            average_cpu_sensor_temp += cpu_sensor_temp_table[i];
+        }
+        average_cpu_sensor_temp = (average_cpu_sensor_temp / AVERAGE_NUMBER);
+
+        /* Reconfigure the current temperature threshold according to the current PCB temperature */
+        cpu_temp = convert_omap_sensor_temp_to_hotspot_temp(OMAP_CPU, sensor_temp);
+        update_thresholds(current_t_high, current_t_low);
+
+        return average_period;
+    } else {
+        return 10000000; /* wait for 10 seconds */
+    }
 }

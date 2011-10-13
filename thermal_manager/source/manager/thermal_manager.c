@@ -158,3 +158,14 @@ int thermal_manager_algo(const char *string)
 
     return state;
 }
+
+int thermal_manager_monitoring(int type)
+{
+    int average_period;
+    if (type & OMAP_CPU) {
+        average_period = average_on_die_temperature();
+        return average_period;
+    } else {
+        return 0;
+    }
+}

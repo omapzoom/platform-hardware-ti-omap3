@@ -70,6 +70,8 @@ struct configinfo {
     int omap_cpu_threshold_panic;
     int omap_cpu_temperature_slope;
     int omap_cpu_temperature_offset;
+    bool pcb_temp_sensor_used;
+    char *pcb_temp_sensor_type;
     int pcb_threshold;
     bool pcb_do_polling;
     int pcb_polling_interval;
