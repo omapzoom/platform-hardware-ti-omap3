@@ -348,7 +348,6 @@ void FakeCameraAdapter::frameCallbackThread()
             frame = ( CameraFrame * ) msg.arg1;
             if ( NULL != frame )
                 {
-                resetFrameRefCount(*frame);
                 sendFrameToSubscribers(frame);
                 }
             }
