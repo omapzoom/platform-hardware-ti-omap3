@@ -17,7 +17,7 @@ char *read_from_file(const char *path)
 {
     FILE *fp;
     char *buf;
-    char buffer[SIZE];
+    static char buffer[SIZE];
     int i;
 
     if (!path)
@@ -45,7 +45,6 @@ char *read_from_file(const char *path)
                 break;
             }
         }
-        /* FIXME: clean-up this copy from buffer to buf */
         buf = strtok(buffer, ".");
         return buf;
     } else {

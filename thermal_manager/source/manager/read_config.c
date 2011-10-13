@@ -237,22 +237,22 @@ int read_config(void)
             index, config_file.temperature_file_sensors[index]);
         fflush(stdout);
     }
-    LOGD("config_file.omap_cpu_threshold_monitoring %ld\n",
+    LOGD("config_file.omap_cpu_threshold_monitoring %d\n",
         config_file.omap_cpu_threshold_monitoring);
     fflush(stdout);
-    LOGD("config_file.omap_cpu_threshold_alert %ld\n",
+    LOGD("config_file.omap_cpu_threshold_alert %d\n",
         config_file.omap_cpu_threshold_alert);
     fflush(stdout);
-    LOGD("config_file.omap_cpu_threshold_panic %ld\n",
+    LOGD("config_file.omap_cpu_threshold_panic %d\n",
         config_file.omap_cpu_threshold_panic);
     fflush(stdout);
-    LOGD("config_file.omap_cpu_temperature_slope %ld\n",
+    LOGD("config_file.omap_cpu_temperature_slope %d\n",
         config_file.omap_cpu_temperature_slope);
     fflush(stdout);
-    LOGD("config_file.omap_cpu_temperature_offset %ld\n",
+    LOGD("config_file.omap_cpu_temperature_offset %d\n",
         config_file.omap_cpu_temperature_offset);
     fflush(stdout);
-    LOGD("config_file.pcb_threshold %ld\n",
+    LOGD("config_file.pcb_threshold %d\n",
         config_file.pcb_threshold);
     fflush(stdout);
     LOGD("config_file.pcb_do_polling %s\n",

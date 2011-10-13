@@ -26,7 +26,7 @@
 
 #define TM_DEBUG 1
 
-int init_done = 0;
+static int init_done = 0;
 
 /*
  *
@@ -37,7 +37,7 @@ int init_done = 0;
  */
 int thermal_manager_init(int type)
 {
-    u32 omap_cpu_sensor_temp;   /* temperature reported by the OMAP CPU on-die temp sensor */
+    int omap_cpu_sensor_temp;   /* temperature reported by the OMAP CPU on-die temp sensor */
     char buffer[1024];
     int cpu_fd_id = -1;
     int pcb_fd_id = -1;
@@ -117,10 +117,10 @@ out:
  */
 int thermal_manager_algo(const char *string)
 {
-    u32 omap_cpu_sensor_temp;   /* temperature reported by the OMAP CPU on-die temp sensor */
+    int omap_cpu_sensor_temp;   /* temperature reported by the OMAP CPU on-die temp sensor */
     u32 emif1_temp_zone;
     u32 emif2_temp_zone;
-    u32 pcb_temp;
+    int pcb_temp;
     int state = 0;
 
     if (strcmp(string, "omap_cpu") == 0) {
@@ -130,7 +130,7 @@ int thermal_manager_algo(const char *string)
          */
         omap_cpu_sensor_temp =
             atoi(read_from_file(config_file.temperature_file_sensors[OMAP_CPU_FILE]));
-        LOGD("Thermal Manager:OMAP CPU sensor temperature %ld\n",
+        LOGD("Thermal Manager:OMAP CPU sensor temperature %d\n",
             omap_cpu_sensor_temp);
         fflush(stdout);
         state = cpu_thermal_governor(omap_cpu_sensor_temp);
@@ -151,7 +151,7 @@ int thermal_manager_algo(const char *string)
          * Call dedicated governor to control PCB junction temperature
          */
         pcb_temp = atoi(read_from_file(config_file.temperature_file_sensors[PCB_FILE]));
-        LOGD("Thermal Manager:pcb temperature %ld\n", pcb_temp);
+        LOGD("Thermal Manager:pcb temperature %d\n", pcb_temp);
         fflush(stdout);
         state = pcb_thermal_governor(pcb_temp);
     }
