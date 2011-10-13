@@ -6179,7 +6179,6 @@ status_t OMXCameraAdapter::sendBracketFrames()
                 sendFrame(cameraFrame);
                 }
             } while ( currentBufferIdx != mLastBracetingBufferIdx );
-
         }
 
     LOG_FUNCTION_NAME_EXIT
@@ -7067,10 +7066,15 @@ OMX_ERRORTYPE OMXCameraAdapter::OMXCameraAdapterFillBufferDone(OMX_IN OMX_HANDLE
 
         stat |= ( ( NO_ERROR == res1 ) || ( NO_ERROR == res2 ) ) ? ( ( int ) NO_ERROR ) : ( -1 );
 
+        int frameCount = 0;
+        CameraFrame * frames[2];
+
         if ( mRecording )
-            {
-            res1  = sendFrame(cameraFrameVideo);
-            }
+        {
+            frames[frameCount] = &cameraFrameVideo;
+            ++frameCount;
+            res1 = NO_ERROR;
+        }
 
         if( mWaitingForSnapshot )
             {
@@ -7083,7 +7087,9 @@ OMX_ERRORTYPE OMXCameraAdapter::OMXCameraAdapterFillBufferDone(OMX_IN OMX_HANDLE
                 }
             }
 
-        res2 = sendFrame(cameraFramePreview);
+        frames[frameCount] = &cameraFramePreview;
+        ++frameCount;
+        res2 = sendFramesToSubscribers(frames, frameCount);
 
         stat |= ( ( NO_ERROR == res1 ) || ( NO_ERROR == res2 ) ) ? ( ( int ) NO_ERROR ) : ( -1 );
 

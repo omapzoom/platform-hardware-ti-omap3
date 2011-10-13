@@ -631,97 +631,135 @@ status_t BaseCameraAdapter::notifyZoomSubscribers(int zoomIdx, bool targetReache
     return ret;
 }
 
+const KeyedVector<int, frame_callback> * BaseCameraAdapter::subscribersForFrameType(
+                    const CameraFrame::FrameType frameType)
+{
+    switch ( frameType )
+    {
+    case CameraFrame::IMAGE_FRAME:
+#if PPM_INSTRUMENTATION || PPM_INSTRUMENTATION_ABS
+        CameraHal::PPM("Shot to Jpeg: ", &mStartCapture);
+#endif
+        return &mImageSubscribers;
+
+    case CameraFrame::RAW_FRAME:
+        return &mRawSubscribers;
+
+    case CameraFrame::VIDEO_FRAME_SYNC:
+        return &mVideoSubscribers;
+
+    case CameraFrame::FRAME_DATA_SYNC:
+        return &mFrameDataSubscribers;
+
+    case CameraFrame::PREVIEW_FRAME_SYNC:
+    case CameraFrame::SNAPSHOT_FRAME:
+        return &mFrameSubscribers;
+
+    default:;
+    }
+
+    CAMHAL_LOGEB("Subscribers not found for frame type: %d", int(frameType));
+    return 0;
+}
+
 status_t BaseCameraAdapter::sendFrameToSubscribers(CameraFrame *frame)
 {
-    status_t ret = NO_ERROR;
-    frame_callback callback;
-    uint32_t i = 0;
-    KeyedVector<int, frame_callback> *subscribers = NULL;
-    size_t refCount = 0;
+    LOG_FUNCTION_NAME
 
-    if ( NULL == frame )
-        {
+    if ( !frame )
+    {
         CAMHAL_LOGEA("Invalid CameraFrame");
-        ret = -EINVAL;
-        }
+        return -EINVAL;
+    }
 
-    if ( NO_ERROR == ret )
-        {
+    const KeyedVector<int, frame_callback> *subscribers =
+        subscribersForFrameType(CameraFrame::FrameType(frame->mFrameType));
 
-        switch(frame->mFrameType)
-            {
-                case CameraFrame::IMAGE_FRAME:
-                    {
+    if ( !subscribers )
+    {
+        CAMHAL_LOGEA("Invalied frame type");
+        return -EINVAL;
+    }
 
-#if PPM_INSTRUMENTATION || PPM_INSTRUMENTATION_ABS
+    Mutex::Autolock locker(mSubscriberLock);
 
-                    CameraHal::PPM("Shot to Jpeg: ", &mStartCapture);
+    const int refCount = subscribers->size();
+    CAMHAL_LOGVB("Type of Frame: 0x%x address: 0x%x refCount start %d",
+                 frame->mFrameType, (int) frame->mBuffer, refCount);
 
+    setFrameRefCount(frame->mBuffer, CameraFrame::FrameType(frame->mFrameType), refCount);
+
+    for ( int i = 0 ; i < (int)subscribers->size(); ++i )
+    {
+        frame->mCookie = reinterpret_cast<void *>(subscribers->keyAt(i));
+        const frame_callback callback = subscribers->valueAt(i);
+        callback(frame);
+    }
+
+    LOG_FUNCTION_NAME_EXIT
+
+    return NO_ERROR;
+}
+
+status_t BaseCameraAdapter::sendFramesToSubscribers(CameraFrame ** const frames, const int count)
+{
+    LOG_FUNCTION_NAME
+
+#ifdef CAMHAL_DEBUG
+    if ( !frames || ( 0 == count) )
+    {
+        CAMHAL_LOGEB("Invalid frames[]");
+        return -EINVAL;
+    }
 #endif
 
-                    subscribers = &mImageSubscribers;
-                    break;
-                    }
-                case CameraFrame::RAW_FRAME:
-                    {
-                    subscribers = &mRawSubscribers;
-                    break;
-                    }
-                case CameraFrame::VIDEO_FRAME_SYNC:
-                    {
-                    subscribers = &mVideoSubscribers;
-                    break;
-                    }
-                case CameraFrame::FRAME_DATA_SYNC:
-                    {
-                    subscribers = &mFrameDataSubscribers;
-                    break;
-                    }
-                case CameraFrame::PREVIEW_FRAME_SYNC:
-                case CameraFrame::SNAPSHOT_FRAME:
-                    {
-                    subscribers = &mFrameSubscribers;
-                    break;
-                    }
-                default:
-                    {
-                    ret = -EINVAL;
-                    break;
-                    }
-            };
+    void * buffer = frames[0]->mBuffer;
 
-        }
-
-    if ( ( NO_ERROR == ret ) &&
-         ( NULL != subscribers ) )
+#ifdef CAMHAL_DEBUG
+    for (int i = 0; i < count; ++i )
+        if (frames[i]->mBuffers != buffer)
         {
-        Mutex::Autolock lock(mSubscriberLock);
+            CAMHAL_LOGEA("Buffer should be the same for all frames");
+        }
+#endif
 
-        refCount = subscribers->size();
-        CAMHAL_LOGVB("Type of Frame: 0x%x address: 0x%x refCount start %d",
-                                    frame->mFrameType,
-                                    ( uint32_t ) frame->mBuffer,
-                                    refCount);
+    Mutex::Autolock locker(mSubscriberLock);
 
-        setFrameRefCount(frame->mBuffer,
-                         (  CameraFrame::FrameType ) frame->mFrameType,
-                         refCount);
+    // setup refcounter for all subscribers for this buffer
+    for ( int i = 0; i < count; ++i )
+    {
+        CameraFrame * const frame = frames[i];
 
-        for ( i = 0 ; i < subscribers->size(); i++ )
-            {
-            frame->mCookie = ( void * ) subscribers->keyAt(i);
-            callback = (frame_callback) subscribers->valueAt(i);
+        const KeyedVector<int, frame_callback> * subscribers =
+            subscribersForFrameType(CameraFrame::FrameType(frame->mFrameType));
+        if ( !subscribers )
+            continue;
+
+        setFrameRefCount(buffer, CameraFrame::FrameType(frame->mFrameType), subscribers->size());
+    }
+
+    // run callbacks for all frames
+    for ( int frameIndex = 0; frameIndex < count; ++frameIndex )
+    {
+        CameraFrame * const frame = frames[frameIndex];
+
+        const KeyedVector<int, frame_callback> * subscribers =
+            subscribersForFrameType(CameraFrame::FrameType(frame->mFrameType));
+
+        if ( !subscribers )
+            continue;
+
+        for ( int i = 0 ; i < (int)subscribers->size(); ++i )
+        {
+            frame->mCookie = reinterpret_cast<void *>(subscribers->keyAt(i));
+            const frame_callback callback = subscribers->valueAt(i);
             callback(frame);
-            }
         }
+    }
 
-    if ( 0 == i )
-        {
-        //No subscribers for this frame
-        ret = -1;
-        }
+    LOG_FUNCTION_NAME_EXIT
 
-    return ret;
+    return NO_ERROR;
 }
 
 int BaseCameraAdapter::getFrameRefCount(void* frameBuf, CameraFrame::FrameType frameType)

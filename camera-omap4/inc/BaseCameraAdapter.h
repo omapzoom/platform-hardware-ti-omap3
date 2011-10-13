@@ -135,6 +135,12 @@ protected:
     //Resets the refCount for this particular frame
     status_t resetFrameRefCount(CameraFrame &frame);
 
+    //Send the frame to subscribers
+    status_t sendFramesToSubscribers(CameraFrame ** const frame, int count);
+
+    const KeyedVector<int, frame_callback> *
+        subscribersForFrameType(CameraFrame::FrameType frameType);
+
     //A couple of helper functions
     void setFrameRefCount(void* frameBuf, CameraFrame::FrameType frameType, int refCount);
     int getFrameRefCount(void* frameBuf, CameraFrame::FrameType frameType);
