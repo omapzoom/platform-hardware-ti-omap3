@@ -1403,7 +1403,7 @@ status_t OMXCameraAdapter::setParameters(const CameraParameters &params)
     if( (valstr = params.get(CameraParameters::KEY_GPS_TIMESTAMP)) != NULL )
         {
         long gpsTimestamp = strtol(valstr, NULL, 10);
-        struct tm *timeinfo = localtime( ( time_t * ) & (gpsTimestamp) );
+        struct tm *timeinfo = gmtime( ( time_t * ) & (gpsTimestamp) );
         if ( NULL != timeinfo )
             {
             mEXIFData.mGPSData.mTimeStampHour = timeinfo->tm_hour;
@@ -1424,7 +1424,7 @@ status_t OMXCameraAdapter::setParameters(const CameraParameters &params)
     if( ( valstr = params.get(CameraParameters::KEY_GPS_TIMESTAMP) ) != NULL )
         {
         long gpsDatestamp = strtol(valstr, NULL, 10);
-        struct tm *timeinfo = localtime( ( time_t * ) & (gpsDatestamp) );
+        struct tm *timeinfo = gmtime( ( time_t * ) & (gpsDatestamp) );
         if ( NULL != timeinfo )
             {
             strftime(mEXIFData.mGPSData.mDatestamp, GPS_DATESTAMP_SIZE, "%Y:%m:%d", timeinfo);
@@ -1654,7 +1654,7 @@ status_t OMXCameraAdapter::setupEXIF()
          if ( OMX_TI_TagReadWrite == exifTags->eStatusDateTime )
              {
              int status = gettimeofday (&sTv, NULL);
-             pTime = localtime (&sTv.tv_sec);
+             pTime = gmtime (&sTv.tv_sec);
              if ( ( 0 == status ) && ( NULL != pTime ) )
                 {
                 snprintf( ( char * ) sharedPtr, EXIF_DATE_TIME_SIZE, "%04d:%02d:%02d %02d:%02d:%02d",
