@@ -138,7 +138,6 @@ protected:
     //A couple of helper functions
     void setFrameRefCount(void* frameBuf, CameraFrame::FrameType frameType, int refCount);
     int getFrameRefCount(void* frameBuf, CameraFrame::FrameType frameType);
-    size_t getSubscriberCount(CameraFrame::FrameType frameType);
 
     enum FrameState {
         STOPPED = 0,
@@ -167,6 +166,8 @@ protected:
     struct timeval mStartCapture;
 
 #endif
+
+    mutable Mutex mReturnFrameLock;
 
     //Different frame subscribers get stored using these
     KeyedVector<int, frame_callback> mFrameSubscribers;

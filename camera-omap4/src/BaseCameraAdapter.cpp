@@ -254,6 +254,8 @@ void BaseCameraAdapter::returnFrame(void* frameBuf, CameraFrame::FrameType frame
     size_t subscriberCount = 0;
     int refCount = -1;
 
+    Mutex::Autolock lock(mReturnFrameLock);
+
     if ( NULL == frameBuf )
         {
         CAMHAL_LOGEA("Invalid frameBuf");
@@ -264,7 +266,6 @@ void BaseCameraAdapter::returnFrame(void* frameBuf, CameraFrame::FrameType frame
         {
 
         refCount = getFrameRefCount(frameBuf,  frameType);
-        subscriberCount = getSubscriberCount(frameType);
 
         if ( 0 < refCount )
             {
@@ -284,14 +285,9 @@ void BaseCameraAdapter::returnFrame(void* frameBuf, CameraFrame::FrameType frame
             }
         else
             {
-             if ( 0 < subscriberCount )
-                {
-                CAMHAL_LOGEB("Error trying to decrement refCount %d for buffer 0x%x", ( uint32_t ) refCount, ( uint32_t ) frameBuf);
-                }
             return;
             }
         }
-
 
     if ( NO_ERROR == res )
         {
@@ -641,8 +637,7 @@ status_t BaseCameraAdapter::sendFrameToSubscribers(CameraFrame *frame)
     frame_callback callback;
     uint32_t i = 0;
     KeyedVector<int, frame_callback> *subscribers = NULL;
-
-    LOG_FUNCTION_NAME
+    size_t refCount = 0;
 
     if ( NULL == frame )
         {
@@ -700,6 +695,18 @@ status_t BaseCameraAdapter::sendFrameToSubscribers(CameraFrame *frame)
     if ( ( NO_ERROR == ret ) &&
          ( NULL != subscribers ) )
         {
+        Mutex::Autolock lock(mSubscriberLock);
+
+        refCount = subscribers->size();
+        CAMHAL_LOGVB("Type of Frame: 0x%x address: 0x%x refCount start %d",
+                                    frame->mFrameType,
+                                    ( uint32_t ) frame->mBuffer,
+                                    refCount);
+
+        setFrameRefCount(frame->mBuffer,
+                         (  CameraFrame::FrameType ) frame->mFrameType,
+                         refCount);
+
         for ( i = 0 ; i < subscribers->size(); i++ )
             {
             frame->mCookie = ( void * ) subscribers->keyAt(i);
@@ -708,36 +715,11 @@ status_t BaseCameraAdapter::sendFrameToSubscribers(CameraFrame *frame)
             }
         }
 
-    LOG_FUNCTION_NAME_EXIT
-
     if ( 0 == i )
         {
         //No subscribers for this frame
         ret = -1;
         }
-
-    return ret;
-}
-
-status_t BaseCameraAdapter::resetFrameRefCount(CameraFrame &frame)
-{
-    status_t ret = NO_ERROR;
-    size_t refCount = 0;
-
-    LOG_FUNCTION_NAME
-
-    if ( NO_ERROR == ret )
-        {
-        refCount = getSubscriberCount(( CameraFrame::FrameType ) frame.mFrameType);
-        CAMHAL_LOGVB("Type of Frame: 0x%x address: 0x%x refCount start %d",
-                                    frame.mFrameType,
-                                    ( uint32_t ) frame.mBuffer,
-                                    refCount);
-
-        setFrameRefCount(frame.mBuffer, (  CameraFrame::FrameType ) frame.mFrameType, refCount);
-        }
-
-    LOG_FUNCTION_NAME_EXIT
 
     return ret;
 }
@@ -824,49 +806,6 @@ void BaseCameraAdapter::setFrameRefCount(void* frameBuf, CameraFrame::FrameType 
 
     LOG_FUNCTION_NAME_EXIT
 
-}
-
-size_t BaseCameraAdapter::getSubscriberCount(CameraFrame::FrameType frameType)
-{
-    size_t ret = 0;
-
-    LOG_FUNCTION_NAME
-
-    switch ( frameType )
-        {
-        case CameraFrame::IMAGE_FRAME:
-        case CameraFrame::RAW_FRAME:
-                {
-                Mutex::Autolock lock(mSubscriberLock);
-                ret = mImageSubscribers.size();
-                }
-            break;
-        case CameraFrame::PREVIEW_FRAME_SYNC:
-        case CameraFrame::SNAPSHOT_FRAME:
-                {
-                Mutex::Autolock lock(mSubscriberLock);
-                ret = mFrameSubscribers.size();
-                }
-            break;
-        case CameraFrame::FRAME_DATA_SYNC:
-                {
-                Mutex::Autolock lock(mSubscriberLock);
-                ret = mFrameDataSubscribers.size();
-                }
-            break;
-        case CameraFrame::VIDEO_FRAME_SYNC:
-                {
-                Mutex::Autolock lock(mSubscriberLock);
-                ret = mVideoSubscribers.size();
-                }
-            break;
-        default:
-            break;
-        };
-
-    LOG_FUNCTION_NAME_EXIT
-
-    return ret;
 }
 
 status_t BaseCameraAdapter::setTimeOut(int sec)

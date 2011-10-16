@@ -574,8 +574,6 @@ int V4LCameraAdapter::previewThread()
         frame.mOffset = 0;
         frame.mTimestamp = systemTime(SYSTEM_TIME_MONOTONIC);;
 
-        resetFrameRefCount(frame);
-
         ret = sendFrameToSubscribers(&frame);
 
         }

@@ -6175,7 +6175,7 @@ status_t OMXCameraAdapter::sendBracketFrames()
             if (!mBracketingBuffersQueued[currentBufferIdx] )
                 {
                 CameraFrame cameraFrame;
-                prepareFrame(imgCaptureData->mBufferHeader[currentBufferIdx], imgCaptureData->mImageType, imgCaptureData, cameraFrame);
+                initCameraFrame(cameraFrame, imgCaptureData->mBufferHeader[currentBufferIdx], imgCaptureData->mImageType, imgCaptureData);
                 sendFrame(cameraFrame);
                 }
             } while ( currentBufferIdx != mLastBracetingBufferIdx );
@@ -7045,7 +7045,10 @@ OMX_ERRORTYPE OMXCameraAdapter::OMXCameraAdapterFillBufferDone(OMX_IN OMX_HANDLE
         CameraFrame cameraFrameVideo, cameraFramePreview;
         if ( mRecording )
             {
-            res1 = prepareFrame(pBuffHeader, CameraFrame::VIDEO_FRAME_SYNC, pPortParam, cameraFrameVideo);
+            res1 = initCameraFrame(cameraFrameVideo,
+                                   pBuffHeader,
+                                   CameraFrame::VIDEO_FRAME_SYNC,
+                                   pPortParam);
             }
 
         if( mWaitingForSnapshot )
@@ -7057,7 +7060,10 @@ OMX_ERRORTYPE OMXCameraAdapter::OMXCameraAdapterFillBufferDone(OMX_IN OMX_HANDLE
             typeOfFrame = CameraFrame::PREVIEW_FRAME_SYNC;
             }
 
-        res2 = prepareFrame(pBuffHeader, typeOfFrame, pPortParam, cameraFramePreview);
+        res2 = initCameraFrame(cameraFramePreview,
+                               pBuffHeader,
+                               typeOfFrame,
+                               pPortParam);
 
         stat |= ( ( NO_ERROR == res1 ) || ( NO_ERROR == res2 ) ) ? ( ( int ) NO_ERROR ) : ( -1 );
 
@@ -7155,7 +7161,11 @@ OMX_ERRORTYPE OMXCameraAdapter::OMXCameraAdapterFillBufferDone(OMX_IN OMX_HANDLE
             }
         }
 
-        stat |= prepareFrame(pBuffHeader, typeOfFrame, pPortParam, cameraFrame);
+        stat |= initCameraFrame(cameraFrame,
+                                pBuffHeader,
+                                typeOfFrame,
+                                pPortParam);
+
         stat |= sendFrame(cameraFrame);
        }
     else if (pBuffHeader->nOutputPortIndex == OMX_CAMERA_PORT_IMAGE_OUT_IMAGE)
@@ -7214,7 +7224,10 @@ OMX_ERRORTYPE OMXCameraAdapter::OMXCameraAdapterFillBufferDone(OMX_IN OMX_HANDLE
 
 
         CameraFrame cameraFrame;
-        stat |= prepareFrame(pBuffHeader, typeOfFrame, pPortParam, cameraFrame);
+        stat |= initCameraFrame(cameraFrame,
+                                pBuffHeader,
+                                typeOfFrame,
+                                pPortParam);
         stat |= sendFrame(cameraFrame);
 
         }
@@ -7354,32 +7367,6 @@ status_t OMXCameraAdapter::sendEmptyRawFrame()
     LOG_FUNCTION_NAME_EXIT
 
     return ret;
-}
-
-
-status_t OMXCameraAdapter::prepareFrame(OMX_IN OMX_BUFFERHEADERTYPE *pBuffHeader,
-                                      int typeOfFrame,
-                                      OMXCameraPortParameters *port, CameraFrame &frame)
-{
-    status_t ret = NO_ERROR;
-
-    LOG_FUNCTION_NAME
-
-
-    if ( NO_ERROR == ret )
-        {
-        ret = initCameraFrame(frame, pBuffHeader, typeOfFrame, port);
-        }
-
-    if ( NO_ERROR == ret )
-        {
-        ret = resetFrameRefCount(frame);
-        }
-
-    LOG_FUNCTION_NAME_EXIT
-
-    return ret;
-
 }
 
 status_t OMXCameraAdapter::sendFrame(CameraFrame &frame)
