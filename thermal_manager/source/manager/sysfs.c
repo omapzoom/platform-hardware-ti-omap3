@@ -12,6 +12,7 @@
  */
 
 #include "sysfs.h"
+#include <utils/Log.h>
 
 char *read_from_file(const char *path)
 {
@@ -21,7 +22,10 @@ char *read_from_file(const char *path)
     int i;
 
     if (!path)
+    {
+        LOGE("Thermal manager: exit(FILE_OPEN_ERROR);");
         exit(FILE_OPEN_ERROR);
+    }
 
     fp = fopen(path, "r");
     if (fp == NULL) {
@@ -29,6 +33,7 @@ char *read_from_file(const char *path)
         LOGD("!!! Could not open (read mode)'%s' !!!\n", path);
         fflush(stdout);
 #endif
+        LOGE("Thermal manager: exit(FILE_OPEN_ERROR);");
         exit(FILE_OPEN_ERROR);
     } else {
 #ifdef DEBUG
@@ -49,6 +54,7 @@ char *read_from_file(const char *path)
         return buf;
     } else {
         fclose(fp);
+        LOGE("Thermal manager: exit(FILE_OPEN_ERROR);");
         exit(FILE_OPEN_ERROR);
     }
 }

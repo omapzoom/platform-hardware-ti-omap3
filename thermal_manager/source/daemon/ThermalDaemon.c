@@ -101,7 +101,7 @@ static void ThermalDaemonEventLog(void)
 
 }
 
-static void ThermalDaemonEventHandler(void)
+static void ThermalDaemonEventHandler(void * p)
 {
     struct sockaddr_nl addr;
     struct pollfd fds;
@@ -110,7 +110,7 @@ static void ThermalDaemonEventHandler(void)
     int length = 1024;
     int sz = 64*1024;
     int s;
-    int manager_status = -1;
+    int manager_status = (int)p;
 
     memset(&addr, 0, sizeof(addr));
     addr.nl_family = AF_NETLINK;
@@ -131,7 +131,7 @@ static void ThermalDaemonEventHandler(void)
         return;
     }
     /* Call into the thermal library */
-    manager_status = thermal_manager_init((OMAP_CPU | PCB));
+//    manager_status = thermal_manager_init((OMAP_CPU | PCB));
     ThermalDaemonEventLog();
     fd = s;
 
@@ -256,6 +256,9 @@ int main(int argc, char * argv [])
     pcb_state = -1;
     lpddr_state = -1;
     fd = -1;
+    int manager_status = -1;
+
+    manager_status = thermal_manager_init((OMAP_CPU | PCB));
 
     /* Setup the signal handlers */
     LOGD("ThermalDaemon:main:Spawning the demon\n");
@@ -263,18 +266,23 @@ int main(int argc, char * argv [])
     signal(SIGTERM, signal_handler);
     LOGD("Spawning Thermal Daemon thread...\n");
     status = pthread_create(&thermalDaemonThrd, NULL,
-        (void *)&ThermalDaemonEventHandler, NULL);
+        (void *)&ThermalDaemonEventHandler, (void*)manager_status);
     if (status) {
         LOGD("Thermal Daemon thread failed to be created %i\n", status);
         exit(1);
     }
 
-    LOGD("Spawning Thermal Daemon Monitoring thread...\n");
-    status = pthread_create(&thermalDaemonThrdMon, NULL,
-        (void *)&ThermalDaemonTempMonitoring, NULL);
-    if (status) {
-        LOGD("Thermal Daemon Monitoring thread failed to be created %i\n", status);
-        exit(1);
+    if ((manager_status & OMAP_CPU) != 0) {
+        LOGD("Spawning Thermal Daemon Monitoring thread...\n");
+        status = pthread_create(&thermalDaemonThrdMon, NULL,
+            (void *)&ThermalDaemonTempMonitoring, NULL);
+        if (status) {
+            LOGD("Thermal Daemon Monitoring thread failed to be created %i\n", status);
+            exit(1);
+        }
+    }
+    else {
+        LOGD("Thermal Daemon: skipping monitoring");
     }
 
     status = pthread_join(thermalDaemonThrd, NULL);
@@ -283,10 +291,12 @@ int main(int argc, char * argv [])
         exit(1);
     }
 
-    status = pthread_join(thermalDaemonThrdMon, NULL);
-    if (status) {
-        LOGD("Thermal Daemon Monitoring join failed to be created %i\n", status);
-        exit(1);
+    if ((manager_status & OMAP_CPU) != 0) {
+        status = pthread_join(thermalDaemonThrdMon, NULL);
+        if (status) {
+            LOGD("Thermal Daemon Monitoring join failed to be created %i\n", status);
+            exit(1);
+        }
     }
 
     return 0;
