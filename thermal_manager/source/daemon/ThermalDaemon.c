@@ -63,6 +63,7 @@ static int fd;
 static int cpu_state;
 static int pcb_state;
 static int lpddr_state;
+static int manager_status = -1;
 
 struct event_logging_sysfs {
     const char *name;
@@ -101,7 +102,7 @@ static void ThermalDaemonEventLog(void)
 
 }
 
-static void ThermalDaemonEventHandler(void * p)
+static void ThermalDaemonEventHandler(void)
 {
     struct sockaddr_nl addr;
     struct pollfd fds;
@@ -110,7 +111,6 @@ static void ThermalDaemonEventHandler(void * p)
     int length = 1024;
     int sz = 64*1024;
     int s;
-    int manager_status = (int)p;
 
     memset(&addr, 0, sizeof(addr));
     addr.nl_family = AF_NETLINK;
@@ -131,7 +131,7 @@ static void ThermalDaemonEventHandler(void * p)
         return;
     }
     /* Call into the thermal library */
-//    manager_status = thermal_manager_init((OMAP_CPU | PCB));
+    manager_status = thermal_manager_init(manager_status);
     ThermalDaemonEventLog();
     fd = s;
 
@@ -256,7 +256,6 @@ int main(int argc, char * argv [])
     pcb_state = -1;
     lpddr_state = -1;
     fd = -1;
-    int manager_status = -1;
 
     manager_status = thermal_manager_init((OMAP_CPU | PCB));
 
@@ -266,7 +265,7 @@ int main(int argc, char * argv [])
     signal(SIGTERM, signal_handler);
     LOGD("Spawning Thermal Daemon thread...\n");
     status = pthread_create(&thermalDaemonThrd, NULL,
-        (void *)&ThermalDaemonEventHandler, (void*)manager_status);
+        (void *)&ThermalDaemonEventHandler, NULL);
     if (status) {
         LOGD("Thermal Daemon thread failed to be created %i\n", status);
         exit(1);

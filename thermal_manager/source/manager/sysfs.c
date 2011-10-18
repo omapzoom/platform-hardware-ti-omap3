@@ -21,19 +21,14 @@ char *read_from_file(const char *path)
     static char buffer[SIZE];
     int i;
 
-    if (!path)
-    {
+    if (!path) {
         LOGE("Thermal manager: exit(FILE_OPEN_ERROR);");
         exit(FILE_OPEN_ERROR);
     }
 
     fp = fopen(path, "r");
     if (fp == NULL) {
-#ifdef DEBUG
-        LOGD("!!! Could not open (read mode)'%s' !!!\n", path);
-        fflush(stdout);
-#endif
-        LOGE("Thermal manager: exit(FILE_OPEN_ERROR);");
+        LOGE("!!! Could not open (read mode)'%s' !!!\n", path);
         exit(FILE_OPEN_ERROR);
     } else {
 #ifdef DEBUG
