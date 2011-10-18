@@ -53,6 +53,7 @@ int thermal_manager_init(int type)
             cpu_fd_id = open(config_file.omap_cpu_temp_sensor_id, O_RDONLY);
             if (cpu_fd_id < 0) {
                 LOGD("Thermal Manager:Cannot find OMAP CPU Temp\n");
+                init_status &= ~OMAP_CPU;
                 goto emif;
             }
             omap_cpu_sensor_temp =
