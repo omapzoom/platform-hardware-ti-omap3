@@ -26,12 +26,13 @@
 #endif
 
 // alsa devices
-#define MM_DEFAULT_DEVICE     "plughw:0,0"
-#define BLUETOOTH_SCO_DEVICE  "plughw:0,0"
-#define FM_TRANSMIT_DEVICE	  "plughw:0,0"
-#define FM_CAPTURE_DEVICE     "plughw:0,1"
-#define MM_LP_DEVICE          "hw:0,6"
-#define HDMI_DEVICE	          "plughw:0,7"
+#define MM_DEFAULT_DEVICE       "plughw:0,0"
+#define BLUETOOTH_SCO_DEVICE    "plughw:0,0"
+#define BLUETOOTH_SCO_LP_DEVICE "plughw:0,6"
+#define FM_TRANSMIT_DEVICE      "plughw:0,0"
+#define FM_CAPTURE_DEVICE       "plughw:0,1"
+#define MM_LP_DEVICE            "hw:0,6"
+#define HDMI_DEVICE             "plughw:0,7"
 
 // omap4 outputs/inputs
 #define OMAP4_OUT_SCO      (\
