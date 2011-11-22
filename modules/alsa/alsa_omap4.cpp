@@ -136,9 +136,9 @@ static alsa_handle_t _defaults[] = {
         format      : SND_PCM_FORMAT_S16_LE,
         channels    : 2,
         sampleRate  : DEFAULT_SAMPLE_RATE,
-        latency     : 200000,
-        bufferSize  : DEFAULT_SAMPLE_RATE / 5,
-        mmap        : 0,
+        latency     : 140000,
+        bufferSize  : 6144,
+        mmap        : 1,
         modPrivate  : (void *)&setAlsaControls,
     },
     {
@@ -258,7 +258,10 @@ const char *deviceName(alsa_handle_t *handle, uint32_t device, int mode)
     int status = 0;
     status = property_get("omap.audio.power", pwr, "FIFO");
 
-    if (device & OMAP4_OUT_SCO || device & OMAP4_IN_SCO)
+    if (device & OMAP4_OUT_SCO)
+        return BLUETOOTH_SCO_LP_DEVICE;
+
+    if (device & OMAP4_IN_SCO)
         return BLUETOOTH_SCO_DEVICE;
 
     if (device & OMAP4_OUT_FM)
@@ -394,7 +397,8 @@ status_t setHardwareParams(alsa_handle_t *handle)
     else
         LOGV("Set %s sample rate to %u HZ", streamName(handle), requestedRate);
 
-    if (strcmp(device, MM_LP_DEVICE) == 0) {
+    if (strcmp(device, MM_LP_DEVICE) == 0 ||
+                                strcmp(device, BLUETOOTH_SCO_LP_DEVICE) == 0) {
         numPeriods = 2;
         LOGI("Using ping-pong!");
     } else {
