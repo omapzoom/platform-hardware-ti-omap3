@@ -30,6 +30,7 @@
 #include "CameraProperties.h"
 #include "overlay_common.h"
 #include <cutils/properties.h>
+#include <binder/IPCThreadState.h>
 
 
 #include <poll.h>
@@ -67,6 +68,23 @@ struct timeval CameraHal::mStartFocus;
 struct timeval CameraHal::mStartCapture;
 
 #endif
+
+// This function designed for applications that violate
+// standard API and need MemoryManager (i.e. Tiler buffers
+// without surface) usage.
+
+bool isMemoryManagerAllowed() {
+    IPCThreadState* ipcState = IPCThreadState::self();
+    uid_t uid = ipcState->getCallingUid();
+    struct stat stbuf;
+    //Check if calling UID is same as in Skype app directory
+    if(!stat("/data/data/com.skype.raider",&stbuf))
+        if(uid == stbuf.st_uid) {
+            return true;
+        }
+
+    return false;
+}
 
 /*-------------Camera Hal Interface Method definitions STARTS here--------------------*/
 
@@ -1315,7 +1333,7 @@ status_t CameraHal::startPreview()
     ///@remarks We support preview without overlay. setPreviewDisplay() should be passed with NULL overlay for this path
     ///                 to work
     if(//!(mMsgEnabled & CAMERA_MSG_PREVIEW_FRAME) &&
-         (!mSetOverlayCalled))
+         (!mSetOverlayCalled)&&(!mIsMemoryManagerAllowed))
         {
         CAMHAL_LOGEA("Preview not started. Preview in progress flag set");
         mPreviewStartInProgress = true;
@@ -2391,6 +2409,7 @@ status_t  CameraHal::dump(int fd, const Vector<String16>& args) const
 
  */
 CameraHal::CameraHal(int cameraId)
+:mIsMemoryManagerAllowed(isMemoryManagerAllowed())
 {
     LOG_FUNCTION_NAME
 
