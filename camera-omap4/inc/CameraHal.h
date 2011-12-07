@@ -1067,6 +1067,8 @@ private:
 
     bool mSetOverlayCalled;
 
+    const bool mIsMemoryManagerAllowed;
+
     uint32_t mPreviewWidth;
     uint32_t mPreviewHeight;
     int32_t mMaxZoomSupported;
