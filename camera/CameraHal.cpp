@@ -97,7 +97,7 @@ const char CameraHal::supportedPictureSizes [] = "3280x2464,3264x2448,2560x2048,
 const char CameraHal::supportedPreviewSizes [] = "1280x720,992x560,864x480,800x480,736x576,736x480,720x576,720x480,768x576,640x480,320x240,352x288,240x160,192x144,176x144,128x96";
 const char CameraHal::supportedFPS [] = "33,30,25,24,20,15,10";
 const char CameraHal::supportedThumbnailSizes []= "320x240,80x60,0x0";
-const char CameraHal::supportedFpsRanges [] = "(8000,10000),(8000,15000),(8000,20000),(8000,30000)";
+const char CameraHal::supportedFpsRanges [] = "(8000,8000),(8000,10000),(10000,10000),(8000,15000),(15000,15000),(8000,20000),(20000,20000),(24000,24000),(25000,25000),(8000,30000),(30000,30000)";
 //const char CameraHal::PARAMS_DELIMITER []= ",";
 
 const supported_resolution CameraHal::supportedPictureRes[] = { {3264, 2448} , {2560, 2048} ,
